@@ -1,0 +1,13 @@
+/.settings/
+/bin/
+/dumps/
+/guilds/
+/libs/
+/logs/
+/markovs/
+/states/
+/temp/
+*.json
+/.classpath
+/.project
+/build.gradle

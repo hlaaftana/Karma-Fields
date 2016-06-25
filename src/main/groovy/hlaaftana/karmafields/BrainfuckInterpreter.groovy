@@ -62,7 +62,7 @@ class BrainfuckInterpreter {
 			howDeep.times { var = var.last() }
 			if (it == "["){
 				howDeep++
-				var.add []
+				var.add([])
 			}else if (it == "]"){
 				howDeep--
 			}else{

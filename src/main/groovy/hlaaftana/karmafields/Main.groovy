@@ -287,12 +287,13 @@ bot.command(["bm", "batchmarkov",
 		"<(number)>": "Calls the markov command (number) times.",
 		"<(number)> (arguments)": "Calls the markov command (number) times with "
 	]){
-	if (bmCallTimes[message.server.id] >= 5){
+	if (bmCallTimes[message.server?.id ?: message.author.id] >= 5){
 		sendMessage("> Slow down. You've called the command a bit more than enough times. Try again in a bit.".block("verilog"))
 		return
 	}
-	if (bmCallTimes[message.server.id]) bmCallTimes[message.server.id]++
-	else bmCallTimes[message.server.id] = 1
+	if (bmCallTimes[message.server?.id ?: message.author.id])
+		bmCallTimes[message.server?.id ?: message.author.id]++
+	else bmCallTimes[message.server?.id ?: message.author.id] = 1
 	BigInteger time = {
 		try {
 			captures[0].toBigInteger() ?: 3
@@ -315,7 +316,7 @@ bot.command(["bm", "batchmarkov",
 		}
 	}
 	Thread.sleep(30_000)
-	bmCallTimes[message.server.id]--
+	bmCallTimes[message.server?.id ?: message.author.id]--
 }
 
 bot.command(["batch",
@@ -727,6 +728,25 @@ bot.command(/to\\u/){
 				"\\u" + Integer.toHexString((it as char) as int).padLeft(4, "0") :
 				it
 		}.sum()).block("verilog"))
+}
+
+bot.command(["bf", "brainfuck"]){
+	def intrp = new BrainfuckInterpreter()
+	boolean done
+	Thread a = Thread.start {
+		sendMessage(String.format("""\
+		|> Output:
+		|%s
+		|> Steps: %d, stack position: %d""".stripMargin(),
+			intrp.interpret(args), intrp.steps,
+			intrp.stackPosition).block("verilog"))
+		done = true
+	}
+	Thread.sleep(5000)
+	if (!done){
+		a.interrupt()
+		sendMessage("> Evaluation took longer than 5 seconds.".block("verilog"))
+	}
 }
 
 bot.command(["help", "commands"]){

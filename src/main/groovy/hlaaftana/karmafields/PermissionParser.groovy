@@ -14,6 +14,10 @@ class PermissionParser {
 			.worksFor(entity, context)
 	}
 
+	static PermissionParser from(String set){
+		new PermissionParser().parse(set)
+	}
+
 	def parse(String set){
 		set.eachLine(this.&parseLine)
 		this

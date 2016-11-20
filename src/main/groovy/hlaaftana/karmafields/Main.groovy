@@ -170,16 +170,23 @@ personalBot = null
 Client me = new Client(logName: "Selfbot")
 Client client = new Client(logName: "|><|")
 Client appStorage = new Client(token: creds["app_storage_token"])
-[client, me, appStorage]*.log*.debug*.enable()
+[client, me, appStorage]*.log.each {
+	it.debug.enable()
+	it.formatter = { Log.Message message ->
+		String.format("[%s] [%s]: %s",
+			MiscUtil.constantize(message.level.name),
+			message.sender, message.content)
+	}
+}
 binding.me = me
 binding.client = client
-client.requester.ptb()
-client.requester.baseUrl += "v6/"
+client.http.ptb()
+client.http.baseUrl += "v6/"
 client.addReconnector()
 client.mute("81402706320699392", "119222314964353025")
 me.addReconnector()
-me.requester.ptb()
-me.requester.baseUrl += "v6/"
+me.http.ptb()
+me.http.baseUrl += "v6/"
 me.serverTimeout *= 4
 me.includedEvents = [Events.SERVER, Events.CHANNEL, Events.ROLE, Events.MEMBER,
 	Events.MESSAGE]

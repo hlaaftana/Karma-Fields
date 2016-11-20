@@ -24,8 +24,9 @@ class PermissionParser {
 	}
 
 	def parseLine(String line){
-		whatis(line[0..(line.indexOf(" "))]){
-			String args = ltrim.matcher(line.substring(value.size()))
+		int li = (line.contains(" ") ? line.indexOf(" ") : line.size()) - 1
+		whatis(line[0..li]){
+			String args = ltrim.matcher(line.substring(li + 1))
 				.replaceFirst("")
 			when("is"){
 				def aa = args.split(/\s+/, 2)

@@ -205,9 +205,8 @@ cleverbot = new CleverbotDotIO(creds["cb_user"], creds["cb_key"])
 yandexdict = new YandexDictionary(key: creds["yandex_dict_key"])
 
 client.listener(Events.READY){
-	client.play("welcome to the afterworld.")
+	client.play("⌀")
 	if (!botReady){
-		Thread.start { LPClient.login(creds["lp_username"], creds["lp_pass"]) }
 		if (!me.token){
 			me.login(creds["self_email"], creds["self_pass"])
 		}
@@ -736,48 +735,6 @@ bot.command("autoguest",
 	}
 }
 
-bot.command("autoguest",
-	group: "Administrative",
-	description: "Automatically gives new guests the set guest role for the server.",
-	usages: [
-		"": "Returns whether autoguesting is currently on or off.",
-		" on": "Turns autoguesting on.",
-		" off": "Turns autoguesting off.",
-		" toggle": "Toggles autoguesting."
-	],
-	allowsPermissions: true){
-	if (args ==~ /\s*/){
-		sendMessage("> Autoguest is currently " +
-			"${message.server.autoguest ? "on" : "off"}."
-			.block("verilog"))
-	}
-	if (args ==~ /\s*on\s*/){
-		if (!author.permissions["manageRoles"]){
-			sendMessage("> You do not have sufficient permissions.".block("verilog"))
-		}else{
-			message.server.autoguest = true
-			sendMessage("> Autoguest is now on.".block("verilog"))
-		}
-	}
-	if (args ==~ /\s*off\s*/){
-		if (!author.permissions["ban"]){
-			sendMessage("> You do not have sufficient permissions.".block("verilog"))
-		}else{
-			message.server.autoguest = false
-			sendMessage("> Autoguest is now off.".block("verilog"))
-		}
-	}
-	if (args ==~ /\s*toggle\s*/){
-		if (!author.permissions["ban"]){
-			sendMessage("> You do not have sufficient permissions.".block("verilog"))
-		}else{
-			message.server.autoguest = !message.server.autoguest
-			sendMessage("> Autoguest is now " +
-				"${message.server.autoguest ? "on" : "off"}.".block("verilog"))
-		}
-	}
-}
-
 bot.command("guest",
 	group: "Administrative",
 	description: "Removes a user's member role. If a guest role is set, gives the user a guest role as well.",
@@ -1118,10 +1075,10 @@ bot.command("color",
 	}
 }
 
-Map roleOptions = [
+roleOptions = [
 	color: { Role it ->
-		!it.hoist && !it.permissionValue &&
-		(it.name ==~ /#?[A-Za-z0-9]+/ ||
+		!it.hoist && !it.permissionValue && it.colorValue &&
+		(it.name ==~ /#?[A-Fa-f0-9]+/ ||
 			MiscUtil.namedColors[it.name.toLowerCase().replaceAll(/\s+/, "")])
 	},
 	unused: { Role it ->
@@ -1132,10 +1089,15 @@ Map roleOptions = [
 	},
 	no_permissions: { Role it ->
 		!it.permissionValue
+	},
+	color_ignore_perms: { Role it ->
+		!it.hoist && it.colorValue && (it.name ==~ /#?[A-Fa-f0-9]+/ ||
+			MiscUtil.namedColors[it.name.toLowerCase().replaceAll(/\s+/, "")])
 	}
 ]
 
 roleOptions.colour = roleOptions.color
+roleOptions.colour_ignore_perms = roleOptions.color_ignore_perms
 
 bot.command("purgeroles",
 	group: "Administrative",
@@ -1159,16 +1121,20 @@ bot.command("purgeroles",
 	try{
 		def options = []
 		if (args){
+			boolean neg = false
 			for (o in args.tokenize()){
-				if (roleOptions[o]) options.add(roleOptions[o])
+				if (o == "!") neg = true
+				else if (this.roleOptions[o])
+					options.add(neg ? { this.roleOptions[0](it).not() } : this.roleOptions[o])
 				else {
 					sendMessage(("> Unknown filter: $o.\n> List of filters: " +
-						roleOptions.keySet().join(", ")).block("verilog"))
+						this.roleOptions.keySet().join(", ")).block("verilog"))
 					return
 				}
+				if (neg) neg = false
 			}
 		}else{
-			options = roleOptions.values()
+			options = this.roleOptions.values()
 		}
 		List<Role> roles = message.server.roles
 		roles.remove(message.server.defaultRole)
@@ -1207,16 +1173,20 @@ bot.command(["filterroles", "purgedroles"],
 	]){
 	def options = []
 	if (args){
+		boolean neg = false
 		for (o in args.tokenize()){
-			if (roleOptions[o]) options.add(roleOptions[o])
+			if (o == "!") neg = true
+			else if (this.roleOptions[o])
+				options.add(neg ? { this.roleOptions[0](it).not() } : this.roleOptions[o])
 			else {
 				sendMessage(("> Unknown filter: $o.\n> List of filters: " +
-					roleOptions.keySet().join(", ")).block("verilog"))
+					this.roleOptions.keySet().join(", ")).block("verilog"))
 				return
 			}
+			if (neg) neg = false
 		}
 	}else{
-		options = roleOptions.values()
+		options = this.roleOptions.values()
 	}
 	List<Role> roles = message.server.roles
 	roles.remove(message.server.defaultRole)

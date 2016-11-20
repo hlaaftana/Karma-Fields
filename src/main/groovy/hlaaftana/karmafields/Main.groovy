@@ -1345,11 +1345,4 @@ bot.command("command",
 	sendMessage(formatCommand(command, usedTrigger.toString(), args))
 }
 
-println "> Commands added."
-
-client.metaClass.getIncludedEvents = {
-	delegate.listenerSystem.listeners.keySet() as List
-}
 bot.initialize()
-
-println "> Bot initialized."

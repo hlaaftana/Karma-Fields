@@ -21,33 +21,33 @@ class BrainfuckInterpreter {
 			whatis(c){
 				when(List){
 					while (stack[stackPosition]){
-						steps++
+						++steps
 						output += interpret(c)
 					}
 				}
 				when ">": {
-					stackPosition++
-					steps++
+					++stackPosition
+					++steps
 				}
 				when "<": {
-					stackPosition--
-					steps++
+					--stackPosition
+					++steps
 				}
 				when "+": {
-					stack[stackPosition]++
-					steps++
+					++stack[stackPosition]
+					++steps
 				}
 				when "-": {
-					stack[stackPosition]--
-					steps++
+					--stack[stackPosition]
+					++steps
 				}
 				when ".": {
 					output += stack[stackPosition] as char
-					steps++
+					++steps
 				}
 				when ",": {
 					stack[stackPosition] = inputMethod(this)
-					steps++
+					++steps
 				}
 			}
 		}
@@ -61,10 +61,10 @@ class BrainfuckInterpreter {
 			def var = a
 			howDeep.times { var = var.last() }
 			if (it == "["){
-				howDeep++
+				++howDeep
 				var.add([])
 			}else if (it == "]"){
-				howDeep--
+				--howDeep
 			}else{
 				var.add it
 			}

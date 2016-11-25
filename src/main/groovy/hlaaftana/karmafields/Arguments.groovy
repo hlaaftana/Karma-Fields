@@ -9,7 +9,7 @@ class Arguments {
 		def a = new Arguments(args)
 		def c = closure.clone()
 		c.delegate = a
-		c()
+		c(a)
 	}
 
 	String getRest(){ raw.substring(index) }
@@ -19,18 +19,18 @@ class Arguments {
 		String ret = ""
 		while (true){
 			if (index == raw.size()){
-				index--
+				--index
 				break
 			}
-			if (Character.isSpaceChar(now[index])){
+			if (Character.isSpaceChar(now[index] as char)){
 				if (ret){
-					index--
+					++index
 					break
 				}
 			}else{
 				ret += now[index]
 			}
-			index++
+			++index
 		}
 		ret
 	}

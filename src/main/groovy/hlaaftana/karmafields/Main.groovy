@@ -44,7 +44,7 @@ import org.jsoup.select.Elements
 import org.jsoup.Jsoup
 
 MiscUtil.registerStringMethods()
-MiscUtil.registerListMethods()
+MiscUtil.registerCollectionMethods()
 
 ImportCustomizer imports = new ImportCustomizer()
 imports.addStarImports(
@@ -171,7 +171,7 @@ Client appStorage = new Client(token: creds["app_storage_token"])
 	it.debug.enable()
 	it.formatter = { Log.Message message ->
 		String.format("[%s] [%s]: %s",
-			MiscUtil.constantize(message.level.name),
+			message.level.name.toUpperCase(),
 			message.sender, message.content)
 	}
 }
@@ -221,7 +221,7 @@ client.listener(Events.READY){
 client.listener(Events.SERVER){
 	server.role("|><|")?.edit(color: 0x0066c2)
 	server.sendMessage(
-		"> Looks like I joined. Yay. Do |>help for commands.".block("verilog"))
+		"> Looks like I joined. Yay. Do |>help for commands.".block("accesslog"))
 	File a = new File("guilds/${server.id}.json")
 	a.createNewFile()
 	if (a.text == ""){
@@ -240,17 +240,17 @@ client.listener(Events.ROLE_UPDATE){
 	whatis(json.role.id){
 		when(server.member_role){
 			server.sendMessage(("> This server's member role ($role) is now locked for me. " +
-				"Please set a new member role using |>memberrole or give me a role with a higher position.").block("verilog"))
+				"Please set a new member role using |>memberrole or give me a role with a higher position.").block("accesslog"))
 		}
 
 		when(server.bot_role){
 			server.sendMessage(("> This server's bot role ($role) is now locked for me. " +
-				"Please set a new bot role using |>botrole or give me a role with a higher position.").block("verilog"))
+				"Please set a new bot role using |>botrole or give me a role with a higher position.").block("accesslog"))
 		}
 
 		when(server.guest_role){
 			server.sendMessage(("> This server's guest role ($role) is now locked for me. " +
-				"Please set a new guest role using |>guestrole or give me a role with a higher position.").block("verilog"))
+				"Please set a new guest role using |>guestrole or give me a role with a higher position.").block("accesslog"))
 		}
 	}
 }
@@ -262,17 +262,17 @@ client.listener(Events.ROLE_DELETE){
 	whatis(json.role_id){
 		when(server.member_role){
 			server.sendMessage(("> This server's member role ($role) is now deleted. " +
-				"Please set a new member role using |>memberrole.").block("verilog"))
+				"Please set a new member role using |>memberrole.").block("accesslog"))
 		}
 
 		when(server.bot_role){
 			server.sendMessage(("> This server's bot role ($role) is now deleted. " +
-				"Please set a new bot role using |>botrole.").block("verilog"))
+				"Please set a new bot role using |>botrole.").block("accesslog"))
 		}
 
 		when(server.guest_role){
 			server.sendMessage(("> This server's guest role ($role) is now deleted. " +
-				"Please set a new guest role using |>guestrole.").block("verilog"))
+				"Please set a new guest role using |>guestrole.").block("accesslog"))
 		}
 	}
 }
@@ -283,17 +283,6 @@ client.listener(Events.MESSAGE){
 		if (!file.exists()) file.createNewFile()
 		file.append(message.content + "\n", "UTF-8")
 	}
-	if (message.private)
-		client.textChannel(180735635106168832)
-			.sendMessage(formatMessage(message))
-}
-
-me.listener(Events.MESSAGE){
-	if (json.author.id == "98457401363025920"){
-		if (message.content.toLowerCase().contains("java")){
-			message.edit(message.content.replaceAll(/(?i)java/, { it + '\u2122' }))
-		}
-	}
 }
 
 client.listener(Events.MEMBER){
@@ -303,7 +292,7 @@ client.listener(Events.MEMBER){
 > Name: $member.name
 > ID: $member.id
 > Account creation time: $member.createTime
-> To member, type |>member, to ban, type |>ban, to bot, type |>bot.""".block("verilog")
+> To member, type |>member, to ban, type |>ban, to bot, type |>bot.""".block("accesslog")
 		server.defaultChannel.sendMessage(message)
 		server.textChannel("bot-mod-log")?.sendMessage(message)
 	}
@@ -313,13 +302,13 @@ client.listener(Events.MEMBER){
 		}catch (NoPermissionException ex){
 			server.sendMessage(
 				"> I tried to automember ${formatFull(member)} but I seem to not have permissions to."
-				.block("verilog"))
+				.block("accesslog"))
 			return
 		}
 		server.defaultChannel.sendMessage("> Automembered ${formatFull(member)}."
-			.block("verilog"))
+			.block("accesslog"))
 		server.textChannel("bot-mod-log")
-			?.sendMessage("> Automembered ${formatFull(member)}.".block("verilog"))
+			?.sendMessage("> Automembered ${formatFull(member)}.".block("accesslog"))
 	}
 }
 
@@ -327,11 +316,17 @@ Map groups = [
 	Meta: [
 		description: "Commands about the bot itself."
 	],
-	Messaround: [
+	Entertainment: [
 		description: "Commands you can use when you're bored."
 	],
 	Administrative: [
 		description: "Commands to ease your job as a staff member."
+	],
+	Useful: [
+		description: "Commands to help you in certain topics."
+	],
+	Server: [
+		description: "Commands to use in servers, but not necessarily administrative."
 	],
 	Misc: [
 		description: "Uncategorized commands."
@@ -350,10 +345,10 @@ bot.command("feedback",
 		client.user(98457401363025920)
 			.privateChannel.sendMessage("""\
 			|> Feedback by ${formatLongUser(author)}:
-			|$args""".stripMargin().block("verilog"))
-		sendMessage("> Feedback sent.".block("verilog"))
+			|$args""".stripMargin().block("accesslog"))
+		sendMessage("> Feedback sent.".block("accesslog"))
 	}catch (ex){
-		sendMessage("> Could not send feedback. Sorry for the inconvience.".block("verilog"))
+		sendMessage("> Could not send feedback. Sorry for the inconvience.".block("accesslog"))
 	}
 }
 
@@ -369,105 +364,68 @@ bot.command(["info", "information"],
 	|> Source code: "https://github.com/hlaaftana/Karma-Fields"
 	|> Library: DiscordG ("https://github.com/hlaaftana/DiscordG") (deprecated)
 	|> Memory usage: ${Runtime.runtime.totalMemory() / (2 ** 20)}/${Runtime.runtime.maxMemory() / (2 ** 20)} MB
-	|> Invite: ${formatUrl(client.fields.botApp.inviteUrl(new Permissions(268435456)))}""".stripMargin().block("verilog"))
+	|> Invite: ${formatUrl(client.fields.botApp.inviteUrl(new Permissions(268435456)))}""".stripMargin().block("accesslog"))
 }
 
-Map bmCallTimes = [:]
 bot.command(["bm", "batchmarkov",
 	~/bm<(\d+?)>/,
 	~/batchmarkov<(\d+?)>/],
-	group: "Messaround",
-	description: "Shortcut to running the batch command for the markov command. Can only be called 5 times per 30 seconds per computers not being infinitely powerful",
-	usages: [
-		"<(number)>": "Calls the markov command (number) times.",
-		"<(number)> (arguments)": "Calls the markov command (number) times with (arguments)."
-	],
-	examples: [
-		"",
-		"<2>",
-		"<2> @hlaaf#7436"
-	]){
-	if (bmCallTimes[message.server?.id ?: message.author.id] >= 3){
-		sendMessage("> Slow down. You've called the command a bit more than enough times. Try again in a bit.".block("verilog"))
-		return
-	}
-	if (bmCallTimes[message.server?.id ?: message.author.id])
-		bmCallTimes[message.server?.id ?: message.author.id]++
-	else bmCallTimes[message.server?.id ?: message.author.id] = 1
-	BigInteger time = {
-		try {
-			captures[0].toBigInteger() ?: 3
-		}catch (ex){
-			3
-		}
-	}()
-	if (time > 5) time = 5
-	Message modifiedMessage = message
-	String newContent = args ? "${usedTrigger}markov $args" : "${usedTrigger}markov"
-	modifiedMessage.object["content"] = newContent
-	Map newData = delegate.clone()
-	newData << [message: modifiedMessage]
-	newData.json.content = newContent
-	Command ass = bot.commands.find { it.aliases*.toString().contains "markov" }
-	time.times {
-		Thread.start { ass(newData) }
-		null
-	}
-	Thread.start {
-		Thread.sleep(30_000)
-		bmCallTimes[message.server?.id ?: message.author.id]--
-	}
+	deprecated: true, preferred: "batch<markov>"){
+	sendMessage("> Use |>batch<markov>.".block("accesslog"))
 }
 
+client.pools.batch = Client.newPool(5, 30_000)
 bot.command(["batch",
 	~/batch<(\w+?)>/,
 	~/batch<(\w+?)\s*,\s*(\d+?)>/],
 	group: "Misc",
 	description: "Runs a command multiple times. Maximum of 5.",
 	usages: [
-		"<(command name), (number)> (command arguments)": "Calls (command name) (number) times with arguments.",
-		"<(command name), (number)>": "Calls (command name) (number) times.",
-		"<(command name)> (command arguments)": "Calls (command name) 3 times with (command arguments).",
-		"<(command name)>": "Calls (command name) 3 times."
+		"<(name), (number)> (arguments)": "Calls (name) (number) times with (arguments).",
+		"<(name), (number)>": "Calls the (name) command (number) times.",
+		"<(name)> (arguments)": "Calls the (name) command 3 times with (arguments).",
+		"<(name)>": "Calls the (name) command 3 times."
 	],
 	examples: [
 		"<markov>",
 		"<markov, 2>",
 		"<markov> @hlaaf#7436"
 	]){
-	String commandName = captures[0]
-	Command ass = bot.commands.find { it.aliases.findAll { !it.regex }*.toString().contains commandName }
-	if (!ass){
-		sendMessage("> Invalid command name. Type \"|>usages batch\" to see how this command can be used.".block("verilog"))
-		return
-	}
-	if (!ass.info.batchable){
-		sendMessage("> Unfortunately that command is not deemed safe enough to be called multiple times in a short time.".block("verilog"))
-		return
-	}
-	BigInteger time = {
-		try {
-			captures[1].toBigInteger() ?: 3
-		}catch (ex){
-			3
+	client.askPool("batch", message.server?.id ?: message.channel.id){
+		String commandName = captures[0]
+		Command ass = bot.commands.find { it.aliases.findAll { !it.regex }*.toString().contains commandName }
+		if (!ass){
+			sendMessage("> Invalid command name. Type \"|>usages batch\" to see how this command can be used.".block("accesslog"))
+			return
 		}
-	}()
-	if (time > 5) time = 5
-	Message modifiedMessage = new Message(message.client, message.object)
-	String newContent = args ? "$usedTrigger$commandName $args" : "$usedTrigger$commandName"
-	modifiedMessage.object["content"] = newContent
-	Map newData = it.clone()
-	newData << [message: modifiedMessage]
-	newData.json.content = newContent
-	println newContent
-	time.times {
-		Thread.start { ass(newData) }
-		null
+		if (!ass.info.batchable){
+			sendMessage("> Unfortunately that command is not deemed safe enough to be called multiple times in a short time.".block("accesslog"))
+			return
+		}
+		BigInteger time = Math.min({
+			try {
+				captures[1].toBigInteger() ?: 3
+			}catch (ex){
+				3
+			}
+		}(), 5)
+		Message modifiedMessage = new Message(message.client, message.object.clone())
+		String newContent = args ? "$usedTrigger$commandName $args" : "$usedTrigger$commandName"
+		modifiedMessage.object["content"] = newContent
+		Map newData = it.clone()
+		newData["message"] = modifiedMessage
+		def a = newData["json"].clone()
+		a.content = newContent
+		newData["json"] = a
+		time.times {
+			Thread.start { ass(newData) }
+			null
+		}
 	}
 }
 
 bot.command("markov",
-	group: "Messaround",
+	group: "Entertainment",
 	description: "Generates a sentence based off of order of words from previous messages.",
 	usages: [
 		"": "A sentence from your messages.",
@@ -496,7 +454,7 @@ bot.command("markov",
 		}else if (input == "random"){
 			id = DiscordObject.forId "random"
 		}else if (input in ["everyone", "@everyone"]){
-			sendMessage("> I've removed the everyone option because it takes years to get all the messages.".block("verilog"))
+			sendMessage("> I've removed the everyone option because it takes years to get all the messages.".block("accesslog"))
 		}else if (input.tokenize()[0] == "name"){
 			String fullName = input.substring("name".size()).trim()
 			id = message.server.members.find { it.name == fullName }
@@ -508,11 +466,11 @@ bot.command("markov",
 	if (id == null){ id = author }
 	List<List<String>> words
 	if (id.id == "random"){
-		words = (new File("markovs/").listFiles() as List).randomItem().readLines()*.tokenize().collect { it as List }
+		words = (new File("markovs/").listFiles() as List).sample().readLines()*.tokenize().collect { it as List }
 	}else{
 		File file = new File("markovs/${id.id}.txt")
 		if (!file.exists()){
-			sendMessage("> Logs for user ${formatFull(id)} doesn't exist.".block("verilog"))
+			sendMessage("> Logs for user ${formatFull(id)} doesn't exist.".block("accesslog"))
 			return
 		}
 		words = file.readLines()*.tokenize().collect { it as List }
@@ -522,13 +480,13 @@ bot.command("markov",
 	List sentence = []
 	while (!stopped){
 		if (++iterations > 2000){
-			sendMessage("> Too many iterations. Markov for ${id instanceof User ? formatFull(id) : "$id"} took too long.".block("verilog"))
+			sendMessage("> Too many iterations. Markov for ${id instanceof User ? formatFull(id) : "$id"} took too long.".block("accesslog"))
 			return
 		}
 		if (!sentence.empty){
 			List lists = words.findAll { it.contains(sentence.last()) }
 			if (lists.empty){
-				sentence += words.flatten().randomItem()
+				sentence += words.flatten().sample()
 				continue
 			}
 			List nextWords = []
@@ -545,16 +503,16 @@ bot.command("markov",
 				stopped = true
 				break
 			}else{
-				String producedWord = nextWords.randomItem()
+				String producedWord = nextWords.sample()
 				sentence += producedWord
 				continue
 			}
 		}else{
-			sentence += words.flatten().randomItem()
+			sentence += words.flatten().sample()
 			continue
 		}
 	}
-	sendMessage("Markov for ${id instanceof User ? formatFull(id) : "$id"}:\n> ${sentence.join(" ").replace("`", "")}\n".block("verilog"))
+	sendMessage("Markov for ${id instanceof User ? formatFull(id) : "$id"}:\n> ${sentence.join(" ").replace("`", "")}\n".block("accesslog"))
 }
 
 bot.command(["perms", "permissions"],
@@ -575,12 +533,12 @@ bot.command("modlog",
 		message.channelMentions[0] :
 		message.server.textChannel(args)
 	if (!author.permissions["manageChannels"]){
-		sendMessage("> Seems so you don't have Manage Channels so I can't let you do that.".block("verilog"))
+		sendMessage("> Seems so you don't have Manage Channels so I can't let you do that.".block("accesslog"))
 	}else if (channel){
 		if (serverJson(message.server).modlogs) message.server.modlogs << channel.id
 		else message.server.modlogs = [channel.id]
-		sendMessage("> Channel #\"$channel\" ($channel.id) successfully added as mod log.".block("verilog"))
-	}else sendMessage("> Invalid channel. Mention the channel or supply an ID or the name of the channel.".block("verilog"))
+		sendMessage("> Channel #\"$channel\" ($channel.id) successfully added as mod log.".block("accesslog"))
+	}else sendMessage("> Invalid channel. Mention the channel or supply an ID or the name of the channel.".block("accesslog"))
 }
 
 bot.command("guestrole",
@@ -591,20 +549,20 @@ bot.command("guestrole",
 	],
 	allowsPermissions: true){
 	if (!author.permissions["manageRoles"]){
-		sendMessage("> Unfortunately you don't seem to have Manage Roles.".block("verilog"))
+		sendMessage("> Unfortunately you don't seem to have Manage Roles.".block("accesslog"))
 		return
 	}
 	Role role = message.roleMentions ?
 		message.roleMentions[0] :
 		message.server.role(args)
 	if (role?.locked)
-		sendMessage("> Unfortunately that role is locked for me so I can't use it.".block("verilog"))
-	else if (role?.isLockedFor(author)) sendMessage("> Unfortunately the role is locked for you so I can't account you on permissions.".block("verilog"))
+		sendMessage("> Unfortunately that role is locked for me so I can't use it.".block("accesslog"))
+	else if (role?.isLockedFor(author)) sendMessage("> Unfortunately the role is locked for you so I can't account you on permissions.".block("accesslog"))
 	else if (role){
 		message.server.guest_role = role.id
-		sendMessage("> Role \"$role\" ($role.id) successfully added as guest role.".block("verilog"))
+		sendMessage("> Role \"$role\" ($role.id) successfully added as guest role.".block("accesslog"))
 	}
-	else sendMessage("> Invalid role. Mention the role or supply an ID or the name of the role.".block("verilog"))
+	else sendMessage("> Invalid role. Mention the role or supply an ID or the name of the role.".block("accesslog"))
 }
 
 bot.command("memberrole",
@@ -615,20 +573,20 @@ bot.command("memberrole",
 	],
 	allowsPermissions: true){
 	if (!author.permissions["manageRoles"]){
-		sendMessage("> Unfortunately you don't seem to have Manage Roles.".block("verilog"))
+		sendMessage("> Unfortunately you don't seem to have Manage Roles.".block("accesslog"))
 		return
 	}
 	Role role = message.roleMentions ?
 		message.roleMentions[0] :
 		message.server.role(args)
 	if (role?.locked)
-		sendMessage("> Unfortunately that role is locked for me so I can't use it.".block("verilog"))
-	else if (role?.isLockedFor(author)) sendMessage("> Unfortunately the role is locked for you so I can't account you on permissions.".block("verilog"))
+		sendMessage("> Unfortunately that role is locked for me so I can't use it.".block("accesslog"))
+	else if (role?.isLockedFor(author)) sendMessage("> Unfortunately the role is locked for you so I can't account you on permissions.".block("accesslog"))
 	else if (role){
 		message.server.member_role = role.id
-		sendMessage("> Role \"$role\" ($role.id) successfully added as member role.".block("verilog"))
+		sendMessage("> Role \"$role\" ($role.id) successfully added as member role.".block("accesslog"))
 	}
-	else sendMessage("> Invalid role. Mention the role or supply an ID or the name of the role.".block("verilog"))
+	else sendMessage("> Invalid role. Mention the role or supply an ID or the name of the role.".block("accesslog"))
 }
 
 bot.command("botrole",
@@ -639,20 +597,20 @@ bot.command("botrole",
 	],
 	allowsPermissions: true){
 	if (!author.permissions["manageRoles"]){
-		sendMessage("> Unfortunately you don't seem to have Manage Roles.".block("verilog"))
+		sendMessage("> Unfortunately you don't seem to have Manage Roles.".block("accesslog"))
 		return
 	}
 	Role role = message.roleMentions ?
 		message.roleMentions[0] :
 		message.server.role(args)
 	if (role?.locked)
-		sendMessage("> Unfortunately that role is locked for me so I can't use it.".block("verilog"))
-	else if (role?.isLockedFor(author)) sendMessage("> Unfortunately the role is locked for you so I can't account you on permissions.".block("verilog"))
+		sendMessage("> Unfortunately that role is locked for me so I can't use it.".block("accesslog"))
+	else if (role?.isLockedFor(author)) sendMessage("> Unfortunately the role is locked for you so I can't account you on permissions.".block("accesslog"))
 	else if (role){
 		message.server.bot_role = role.id
-		sendMessage("> Role \"$role\" ($role.id) successfully added as bot role.".block("verilog"))
+		sendMessage("> Role \"$role\" ($role.id) successfully added as bot role.".block("accesslog"))
 	}
-	else sendMessage("> Invalid role. Mention the role or supply an ID or the name of the role.".block("verilog"))
+	else sendMessage("> Invalid role. Mention the role or supply an ID or the name of the role.".block("accesslog"))
 }
 
 bot.command("automember",
@@ -668,31 +626,31 @@ bot.command("automember",
 	if (args ==~ /\s*/){
 		sendMessage("> Automember is currently " +
 			"${message.server.automember ? "on" : "off"}."
-			.block("verilog"))
+			.block("accesslog"))
 	}
 	if (args ==~ /\s*on\s*/){
 		if (!author.permissions["manageRoles"]){
-			sendMessage("> You do not have sufficient permissions.".block("verilog"))
+			sendMessage("> You do not have sufficient permissions.".block("accesslog"))
 		}else{
 			message.server.automember = true
-			sendMessage("> Automember is now on.".block("verilog"))
+			sendMessage("> Automember is now on.".block("accesslog"))
 		}
 	}
 	if (args ==~ /\s*off\s*/){
 		if (!author.permissions["ban"]){
-			sendMessage("> You do not have sufficient permissions.".block("verilog"))
+			sendMessage("> You do not have sufficient permissions.".block("accesslog"))
 		}else{
 			message.server.automember = false
-			sendMessage("> Automember is now off.".block("verilog"))
+			sendMessage("> Automember is now off.".block("accesslog"))
 		}
 	}
 	if (args ==~ /\s*toggle\s*/){
 		if (!author.permissions["ban"]){
-			sendMessage("> You do not have sufficient permissions.".block("verilog"))
+			sendMessage("> You do not have sufficient permissions.".block("accesslog"))
 		}else{
 			message.server.automember = !message.server.automember
 			sendMessage("> Automember is now " +
-				"${message.server.automember ? "on" : "off"}.".block("verilog"))
+				"${message.server.automember ? "on" : "off"}.".block("accesslog"))
 		}
 	}
 }
@@ -710,31 +668,31 @@ bot.command("autoguest",
 	if (args ==~ /\s*/){
 		sendMessage("> Autoguest is currently " +
 			"${message.server.autoguest ? "on" : "off"}."
-			.block("verilog"))
+			.block("accesslog"))
 	}
 	if (args ==~ /\s*on\s*/){
 		if (!author.permissions["manageRoles"]){
-			sendMessage("> You do not have sufficient permissions.".block("verilog"))
+			sendMessage("> You do not have sufficient permissions.".block("accesslog"))
 		}else{
 			message.server.autoguest = true
-			sendMessage("> Autoguest is now on.".block("verilog"))
+			sendMessage("> Autoguest is now on.".block("accesslog"))
 		}
 	}
 	if (args ==~ /\s*off\s*/){
 		if (!author.permissions["ban"]){
-			sendMessage("> You do not have sufficient permissions.".block("verilog"))
+			sendMessage("> You do not have sufficient permissions.".block("accesslog"))
 		}else{
 			message.server.autoguest = false
-			sendMessage("> Autoguest is now off.".block("verilog"))
+			sendMessage("> Autoguest is now off.".block("accesslog"))
 		}
 	}
 	if (args ==~ /\s*toggle\s*/){
 		if (!author.permissions["ban"]){
-			sendMessage("> You do not have sufficient permissions.".block("verilog"))
+			sendMessage("> You do not have sufficient permissions.".block("accesslog"))
 		}else{
 			message.server.autoguest = !message.server.autoguest
 			sendMessage("> Autoguest is now " +
-				"${message.server.autoguest ? "on" : "off"}.".block("verilog"))
+				"${message.server.autoguest ? "on" : "off"}.".block("accesslog"))
 		}
 	}
 }
@@ -748,9 +706,9 @@ bot.command("guest",
 	],
 	allowsPermissions: true){
 	if (!author.permissions["manageRoles"])
-		sendMessage("> You don't have sufficient permissions.".block("verilog"))
+		sendMessage("> You don't have sufficient permissions.".block("accesslog"))
 	else if (!serverJson(message.server).member_role)
-		sendMessage("> This server doesn't have a member role set.".block("verilog"))
+		sendMessage("> This server doesn't have a member role set.".block("accesslog"))
 	else try{
 		def guestRole = message.server.role(serverJson(message.server).guest_role)
 		def memberRole = message.server.role(message.server.member_role)
@@ -765,10 +723,10 @@ bot.command("guest",
 			it.editRoles(it.roles + guestRole - memberRole - null)
 			output += "\n> $it ($it.id)"
 		}
-		sendMessage(output.block("verilog"))
-		message.server.modlogs.collect { message.server.channel(it) }*.sendMessage(output.block("verilog"))
+		sendMessage(output.block("accesslog"))
+		message.server.modlogs.collect { message.server.channel(it) }*.sendMessage(output.block("accesslog"))
 	}catch (NoPermissionException ex){
-		sendMessage("> Failed to guest member(s). I don't seem to have permissions.".block("verilog"))
+		sendMessage("> Failed to guest member(s). I don't seem to have permissions.".block("accesslog"))
 	}
 }
 
@@ -781,9 +739,9 @@ bot.command("member",
 	],
 	allowsPermissions: true){
 	if (!author.permissions["manageRoles"])
-		sendMessage("> You don't have sufficient permissions.".block("verilog"))
+		sendMessage("> You don't have sufficient permissions.".block("accesslog"))
 	else if (!serverJson(message.server).member_role)
-		sendMessage("> This server doesn't have a member role set.".block("verilog"))
+		sendMessage("> This server doesn't have a member role set.".block("accesslog"))
 	else try{
 		def role = message.server.role(message.server.member_role)
 		List<Member> members
@@ -797,10 +755,10 @@ bot.command("member",
 			it.addRole(role)
 			output += "\n> $it ($it.id)"
 		}
-		sendMessage(output.block("verilog"))
-		message.server.modlogs.collect { message.server.channel(it) }*.sendMessage(output.block("verilog"))
+		sendMessage(output.block("accesslog"))
+		message.server.modlogs.collect { message.server.channel(it) }*.sendMessage(output.block("accesslog"))
 	}catch (NoPermissionException ex){
-		sendMessage("> Failed to member member(s). I don't seem to have permissions.".block("verilog"))
+		sendMessage("> Failed to member member(s). I don't seem to have permissions.".block("accesslog"))
 	}
 }
 
@@ -813,9 +771,9 @@ bot.command("bot",
 	],
 	allowsPermissions: true){
 	if (!author.permissions["manageRoles"]){
-		sendMessage("> You don't have sufficient permissions.".block("verilog"))
+		sendMessage("> You don't have sufficient permissions.".block("accesslog"))
 	}else if (!serverJson(message.server).bot_role){
-		sendMessage("> This server doesn't have a bot role set.".block("verilog"))
+		sendMessage("> This server doesn't have a bot role set.".block("accesslog"))
 	}else try{
 		def role = message.server.role(message.server.bot_role)
 		List<Member> members
@@ -829,10 +787,10 @@ bot.command("bot",
 			it.addRole(role)
 			output += "\n> $it ($it.id)"
 		}
-		sendMessage(output.block("verilog"))
-		message.server.modlogs.collect { message.server.channel(it) }*.sendMessage(output.block("verilog"))
+		sendMessage(output.block("accesslog"))
+		message.server.modlogs.collect { message.server.channel(it) }*.sendMessage(output.block("accesslog"))
 	}catch (NoPermissionException ex){
-		sendMessage("> Failed to bot member(s). I don't seem to have permissions.".block("verilog"))
+		sendMessage("> Failed to bot member(s). I don't seem to have permissions.".block("accesslog"))
 	}
 }
 
@@ -860,7 +818,7 @@ bot.command(["ban",
 			List<Member> members
 			if (message.mentions.empty){
 				if ((now() - message.server.lastMember.createTime.time) >= 60_000 && !args.contains("regardless")){
-					sendMessage("> The latest member, ${formatFull(message.server.latestMember)}, joined more than 1 minute ago. To ban them regardless of that, type \"|>ban regardless\".".block("verilog"))
+					sendMessage("> The latest member, ${formatFull(message.server.latestMember)}, joined more than 1 minute ago. To ban them regardless of that, type \"|>ban regardless\".".block("accesslog"))
 					return
 				}
 				members = [message.server.lastMember]
@@ -872,12 +830,12 @@ bot.command(["ban",
 				it.ban(days)
 				output += "\n> $it ($it.id)"
 			}
-			sendMessage(output.block("verilog"))
-			message.server.modlogs.collect { message.server.channel(it) }*.sendMessage(output.block("verilog"))
+			sendMessage(output.block("accesslog"))
+			message.server.modlogs.collect { message.server.channel(it) }*.sendMessage(output.block("accesslog"))
 		}catch (NoPermissionException ex){
-			sendMessage("> Failed to ban member(s). I don't seem to have permissions.".block("verilog"))
+			sendMessage("> Failed to ban member(s). I don't seem to have permissions.".block("accesslog"))
 		}
-	}else sendMessage("> You don't have permissions.".block("verilog"))
+	}else sendMessage("> You don't have permissions.".block("accesslog"))
 }
 
 
@@ -906,7 +864,7 @@ bot.command(["softban",
 			List<Member> members
 			if (message.mentions.empty){
 				if ((now() - message.server.lastMember.createTime.time) >= 60_000 && !args.contains("regardless")){
-					sendMessage("> The latest member, ${formatFull(message.server.latestMember)}, joined more than 1 minute ago. To ban them regardless of that, type \"|>ban regardless\".".block("verilog"))
+					sendMessage("> The latest member, ${formatFull(message.server.latestMember)}, joined more than 1 minute ago. To ban them regardless of that, type \"|>ban regardless\".".block("accesslog"))
 					return
 				}
 				members = [message.server.lastMember]
@@ -919,18 +877,18 @@ bot.command(["softban",
 				it.unban()
 				output += "\n> $it ($it.id)"
 			}
-			sendMessage(output.block("verilog"))
-			message.server.modlogs.collect { message.server.channel(it) }*.sendMessage(output.block("verilog"))
+			sendMessage(output.block("accesslog"))
+			message.server.modlogs.collect { message.server.channel(it) }*.sendMessage(output.block("accesslog"))
 		}catch (NoPermissionException ex){
-			sendMessage("> Failed to softban member(s). I don't seem to have permissions.".block("verilog"))
+			sendMessage("> Failed to softban member(s). I don't seem to have permissions.".block("accesslog"))
 		}
-	}else sendMessage("> You don't have permissions.".block("verilog"))
+	}else sendMessage("> You don't have permissions.".block("accesslog"))
 }
 
 
 
 bot.command("eval",
-	group: "Misc",
+	group: "Useful",
 	description: "Evaluates Groovy code. Everyone can use this.",
 	usages: [
 		" (code)": "Evaluates the given code."
@@ -952,7 +910,7 @@ bot.command("eval",
 						this.metaClass.methods
 							.collectEntries { [(it.name): this.&"$it.name"] }))),
 						cc)
-					.evaluate(dea).toString()).block("verilog"))
+					.evaluate(dea).toString()).block("groovy"))
 		}catch (ex){
 			sendMessage(ex.toString().block("groovy"))
 		}
@@ -964,25 +922,25 @@ bot.command("eval",
 					.field("script", dea)
 					.asString().body)
 			}catch (ex){
-				sendMessage("> Failed to request evaluation.".block("verilog"))
+				sendMessage("> Failed to request evaluation.".block("accesslog"))
 				null
 			}
 		}()
 		if (evaluation == null) return
 		String output = ""
 		if (evaluation["executionResult"]){
-			output += "\n" + "> Result:\n$evaluation.executionResult".block("verilog")
+			output += "\n" + "> Result:\n$evaluation.executionResult".block("groovy")
 		}
 		if (evaluation["outputText"]){
-			output += "\n" + "> Output:\n$evaluation.outputText".block("verilog")
+			output += "\n" + "> Output:\n$evaluation.outputText".block("groovy")
 		}
 		if (evaluation["stacktraceText"]){
-			output += "\n" + "> Error:\n$evaluation.stacktraceText".block("verilog")
+			output += "\n" + "> Error:\n$evaluation.stacktraceText".block("groovy")
 		}
 		try{
 			sendMessage(output)
 		}catch (ex){
-			Message dong = sendMessage("> Message too long. Uploading JSON result of evaluation...".block("verilog"))
+			Message dong = sendMessage("> Message too long. Uploading JSON result of evaluation...".block("accesslog"))
 			sendFile(JSONUtil.dump("temp/evaluation_${message.id}.json", evaluation))
 			dong.delete()
 		}
@@ -995,7 +953,7 @@ bot.command("ruby"){
 		this.binding.variables) << it).each { k, v -> cnt.put(k, v) }
 	try{
 		sendMessage(("> " + JavaEmbedUtils.rubyToJava(
-			cnt.parse(args).run())).block("verilog"))
+			cnt.parse(args).run())).block("rb"))
 	}catch (ex){
 		sendMessage(ex.toString().block("rb"))
 	}
@@ -1004,7 +962,7 @@ bot.command("ruby"){
 
 Random colorRandom = new Random()
 bot.command("color",
-	group: "Misc",
+	group: "Server",
 	description: "Creates/reuses a role that has a color and no other special aspect to it.",
 	usages: [
 		" (hexadecimal number)": "Uses a hexadecimal number as the color",
@@ -1020,7 +978,7 @@ bot.command("color",
 	],
 	allowsPermissions: true){
 	if (!message.server){
-		sendMessage("> We aren't in a server.".block("verilog"))
+		sendMessage("> We aren't in a server.".block("accesslog"))
 		return
 	}
 	args = args.replaceAll(/\s+/, "")
@@ -1030,21 +988,21 @@ bot.command("color",
 		color = colorRandom.nextInt(0xFFFFFF)
 	}else if (args ==~ /[0-9a-fA-F]+/){
 		try{
-			color = Long.parseLong(args, 16)
+			color = Integer.parseInt(args, 16)
 		}catch (NumberFormatException ex){
-			sendMessage("> Invalid hexadecimal number. Probably too large. We're talking 64 bits here.".block("verilog"))
+			sendMessage("> Invalid hexadecimal number. Probably too large.".block("accesslog"))
 			return
 		}
 	}else if (args ==~ /(?:rgb\()?[0-9]+,[0-9]+,[0-9]+(?:\))?/){
 		List<Byte> rgb = {
 			try{
-				return args.replaceAll(/rgb\((.*?)\)/){ full, ass -> ass }.tokenize(",").collect { Byte.parseByte((Short.parseShort(it) - 128).toString()) }
+				args.replaceAll(/rgb\((.*?)\)/){ full, ass -> ass }.tokenize(",").collect { Byte.parseByte((Short.parseShort(it) - 128).toString()) }
 			}catch (NumberFormatException ex){
-				return []
+				[]
 			}
 		}()
 		if (rgb.empty){
-			sendMessage("> Invalid RGB tuple. An example of one is |14, 3, 240|. The values have to be between 0 and 256 (including 0, not including 256).".block("verilog"))
+			sendMessage("> Invalid RGB tuple. An example of one is |14, 3, 240|. The values have to be between 0 and 256 (including 0, not including 256).".block("accesslog"))
 			return
 		}
 		rgb.each { byte c ->
@@ -1053,29 +1011,46 @@ bot.command("color",
 		}
 	}else if (args ==~ /\w+/){
 		if (!MiscUtil.namedColors.containsKey(args)){
-			sendMessage("> Invalid named color. List here: ${formatUrl("http://www.december.com/html/spec/colorsvg.html")}".block("verilog"))
+			sendMessage("> Invalid named color. List here: ${formatUrl("http://www.december.com/html/spec/colorsvg.html")}".block("accesslog"))
 			return
 		}
 		color = MiscUtil.namedColors[args]
 	}
+	if (color > 0xFFFFFF){
+		sendMessage("> Color is bigger than #FFFFFF.".block("accesslog"))
+		return
+	}
 	try{
-		List oldRoles = author.roles.findAll { it.hoist || !(it.name ==~ /#?[0-9a-fA-F]+/) || it.name.contains(" ") || it.permissionValue > author.server.defaultRole.permissionValue || !(it.permissionValue == 0) }
+		def a = message.server.defaultRole.permissionValue
+		Map groupedRoles = author.roles.groupBy {
+			it.hoist || !(it.name ==~ /#?[0-9a-fA-F]+/) ||
+			it.name.contains(" ") ||
+			it.permissionValue > a ||
+			!(it.permissionValue == 0) ? 1 : 0 }
+		// 0 is color roles, 1 is the others
 		boolean created
-		Role role = message.server.roles.find {
-			!it.hoist && it.permissionValue == 0 &&
-				it.name ==~ /#?[0-9a-fA-F]+/ &&
-				it.colorValue == color
-		} ?: { ->
-			created = true
-			message.server.createRole(name:
-				Long.toHexString(color).padLeft(6, "0"),
-				color: color,
-				permissions: 0)
-		}()
-		author.editRoles(oldRoles + role)
-		sendMessage(("> Color ${created ? "created" : "found"} and added.\n> Your previous roles: ${author.roles*.name.join(", ")}").block("verilog"))
+		Role role
+		if (color){
+			role = message.server.roles.find {
+				!it.hoist && it.permissionValue <= a &&
+					it.name ==~ /#?[0-9a-fA-F]+/ &&
+					it.colorValue == color
+			} ?: { ->
+				created = true
+				message.server.createRole(name:
+					Long.toHexString(color).padLeft(6, "0"),
+					color: color,
+					permissions: 0)
+			}()
+		}
+		author.editRoles((groupedRoles[1] ?: []) + (color ? role : []))
+		def m = color ? "> Color ${created ? "created" : "found"} and added." :
+			"> That color is the default color, so I just removed your other colors."
+		if (groupedRoles[0])
+			m += "\n> Removed roles: ${groupedRoles[0]*.name.join(", ")}"
+		sendMessage(m.block("accesslog"))
 	}catch (NoPermissionException ex){
-		sendMessage("> I don't have sufficient permissions. Give me Manage Roles.".block("verilog"))
+		sendMessage("> I don't have sufficient permissions. I need Manage Roles.".block("accesslog"))
 	}
 }
 
@@ -1119,7 +1094,7 @@ bot.command("purgeroles",
 	allowsPermissions: true){
 	if (!author.permissions["manageRoles"]){
 		sendMessage(("> You don't have sufficient permissions. Ask a staff member to " +
-			"call this command to do what you want.").block("verilog"))
+			"call this command to do what you want.").block("accesslog"))
 		return
 	}
 	try{
@@ -1132,7 +1107,7 @@ bot.command("purgeroles",
 					options.add(neg ? { this.roleOptions[0](it).not() } : this.roleOptions[o])
 				else {
 					sendMessage(("> Unknown filter: $o.\n> List of filters: " +
-						this.roleOptions.keySet().join(", ")).block("verilog"))
+						this.roleOptions.keySet().join(", ")).block("accesslog"))
 					return
 				}
 				if (neg) neg = false
@@ -1145,7 +1120,7 @@ bot.command("purgeroles",
 		options.each {
 			roles = roles.findAll(it)
 		}
-		Message a = sendMessage("> Deleting ${roles.size()} roles in about ${roles.size() / 2} seconds...".block("verilog"))
+		Message a = sendMessage("> Deleting ${roles.size()} roles in about ${roles.size() / 2} seconds...".block("accesslog"))
 		long s = now()
 		if (roles){
 			withPool {
@@ -1156,14 +1131,14 @@ bot.command("purgeroles",
 				roles.last().&delete.callAsync()
 			}
 		}
-		a.edit("> Deleted all ${roles.size()} roles in ${(now() - s) / 1000} seconds.".block("verilog"))
+		a.edit("> Deleted all ${roles.size()} roles in ${(now() - s) / 1000} seconds.".block("accesslog"))
 	}catch (NoPermissionException ex){
-		sendMessage("> I don't have permissions to manage roles.".block("verilog"))
+		sendMessage("> I don't have permissions to manage roles.".block("accesslog"))
 	}
 }
 
 bot.command(["filterroles", "purgedroles"],
-	group: "Misc",
+	group: "Server",
 	description: "Finds roles with specific filters. If no filters are given, all filters will be used.\n\n" +
 		"List of filters: ${roleOptions.keySet().join(", ")}",
 	usages: [
@@ -1184,7 +1159,7 @@ bot.command(["filterroles", "purgedroles"],
 				options.add(neg ? { this.roleOptions[0](it).not() } : this.roleOptions[o])
 			else {
 				sendMessage(("> Unknown filter: $o.\n> List of filters: " +
-					this.roleOptions.keySet().join(", ")).block("verilog"))
+					this.roleOptions.keySet().join(", ")).block("accesslog"))
 				return
 			}
 			if (neg) neg = false
@@ -1197,39 +1172,21 @@ bot.command(["filterroles", "purgedroles"],
 	options.each {
 		roles = roles.findAll(it)
 	}
-	sendMessage("> ${roles.join(", ")}\n> ${roles.size()} total".block("verilog"))
+	sendMessage("> ${roles.join(", ")}\n> ${roles.size()} total".block("accesslog"))
 }
 
 bot.command(["join", "invite"],
 	group: "Meta",
 	description: "Gives the bot's URL to add it to servers. No arguments."){
 	sendMessage(("> " + formatUrl(client.fields.botApp.inviteUrl(
-		new Permissions(manageRoles: true)))).block("verilog"))
+		new Permissions(manageRoles: true)))).block("accesslog"))
 }
 
-bot.command(["randomcolor", "randomcolour"],
-	group: "Misc",
-	description: "Posts an image containing information about a random color which is also the background of the image.",
-	usages: [
-		"": "Sets width and height to 250.",
-		" (number)": "Sets width and height to the number.",
-		" (width) (height)": "Sets with and height individually."
-	],
-	batchable: true){
-	List ints = args.tokenize().collect {
-		try {
-			it.replaceAll(/\D/, "").toInteger()
-		}catch (ex){
-			256
-		}
-	}
-	def (width, height) = ints.size() == 0 ? [256, 256] :
-		ints.size() == 1 ? [ints[0], ints[0]] :
-		ints
-	width > 2500 && (width = 2500)
-	height > 2500 && (height = 2500)
-	def y = draw(width, height){
-		Color c = new Color(colorRandom.nextInt(0xffffff))
+def drawColor(int clr, int width, int height){
+	width = Math.min(width, 2500)
+	height = Math.min(width, 2500)
+	draw(width, height){
+		Color c = new Color(clr)
 		int rgb = (c.RGB << 8) >>> 8
 		color = c
 		fillRect(0, 0, it.width, it.height)
@@ -1238,21 +1195,167 @@ bot.command(["randomcolor", "randomcolour"],
 		drawString("RGB: $c.red, $c.green, $c.blue", 10, 40)
 		drawString("Dec: $rgb", 10, 60)
 	}
+}
+
+bot.command(["showcolor", "showcolour",
+		~/showcolou?r<(\d+?)>/,
+		~/showcolou?r<(\d+?)\s*,\s*(\d+?)>/],
+	group: "Useful",
+	description: "Posts an image containing (information about) a color.",
+	usages: [
+		" (color)": "Sets width and height to 250 and shows (color).",
+		" random": "Sets width and height to 250 and shows a random color.",
+		" my|me|mine": "Sets width and height to 250 and shows your color.",
+		"<(size)> (color)": "Sets width and height to (size) and shows (color).",
+		"<(width), (height)> (color)": "Sets width and height individually and shows (color)."
+	],
+	batchable: true){
+	int color
+	if (args.toLowerCase() == "random"){
+		color = colorRandom.nextInt(0xFFFFFF)
+	}else if (args.toLowerCase() in ["me", "my", "mine"]){
+		color = author instanceof Member ? author.colorValue : 0
+	}else if (args ==~ /[0-9a-fA-F]+/){
+		try{
+			color = Integer.parseInt(args, 16)
+		}catch (NumberFormatException ex){
+			sendMessage("> Invalid hexadecimal number. Probably too large.".block("accesslog"))
+			return
+		}
+	}else if (args ==~ /(?:rgb\()?[0-9]+,[0-9]+,[0-9]+(?:\))?/){
+		List<Byte> rgb = {
+			try{
+				args.replaceAll(/rgb\((.*?)\)/){ full, ass -> ass }.tokenize(",").collect { Byte.parseByte((Short.parseShort(it) - 128).toString()) }
+			}catch (NumberFormatException ex){
+				[]
+			}
+		}()
+		rgb.each { byte c ->
+			color = (color << 8) | c
+		}
+	}else if (args ==~ /\w+/){
+		if (!MiscUtil.namedColors.containsKey(args)){
+			sendMessage("> Invalid named color. List here: ${formatUrl("http://www.december.com/html/spec/colorsvg.html")}".block("accesslog"))
+			return
+		}
+		color = MiscUtil.namedColors[args]
+	}
+	def (width, height) = captures.size() == 1 ? [captures[0], captures[0]]*.toInteger() :
+		captures.size() == 2 ? [captures[0], captures[1]]*.toInteger() : [250, 250]
+	def y = drawColor(color, width, height)
 	try{
-		sendFile(y, filename: "randomcolor.png")
+		sendFile(y, filename: "color.png")
 	}catch (NoPermissionException ex){
-		sendMessage("> I don't seem to have permissions to send files. Maybe you need to try in a testing channel?".block("verilog"))
+		sendMessage("> I don't seem to have permissions to send files. Maybe you need to try in a testing channel?".block("accesslog"))
 	}
 }
 
-bot.command("jsonize",
-	group: "Misc",
+bot.command(["logs",
+	~/logs(\+)?/,
+	~/logs<(\d+?)>(\+)?/],
+	group: "Useful",
+	description: "Looks up messages from certain points in time in a channel.",
+	usages: [
+		"": "Looks up most recent posts.",
+		" first": "Looks up first posts.",
+		" id (id)": "Looks up posts at the ID given.",
+		" date (year-month-day-...)": "Looks up posts at the given date (UTC). Every part of the part before is separated by a dash. The progression is year, month, day, hour, minute, second and millisecond. Keep in mind that 2016 works but 16 has problems. Check examples if you're confused.",
+		" unix (timestamp)": "Looks up posts at the given Unix timestamp.",
+		" multiplier (multiplier)": "Multiplies the channel id by the given multiplier and looks up messages at that ID. Shouldn't be more than 2, unless the channel is old Discord-creation-wise.",
+		"<(number)> (arguments)": "Sets the post number, not more than 100. Arguments can be any of the above.",
+		"+ (arguments)": "Shows posts after the given time. Otherwise before. Does not work for first."
+	],
+	examples: [
+		"<25>",
+		"+",
+		"<25>+",
+		" id 243730654498521100",
+		" date 2016-07-04",
+		" date 2016-07-04-15-03-39",
+		" unix 1479959375236",
+		" multiplier 1.405",
+		"<27> date 2016-07-04-15-03-39",
+		"<27>+ date 2016-07-04-15-03-39",
+	]){
+	def maddy = captures.find { it.isInteger() }
+	int number = maddy ? Math.min(maddy.toInteger(), 100) : 50
+	boolean after = captures.any { it == "+" }
+	String id
+	if (args){
+		String error
+		argp(args){ Arguments a ->
+			String choice = a.afterSpace
+			whatis(choice){
+				when("first"){
+					id = message.channel.id
+					after = true
+				}
+				when("id"){
+					if (a.rest.long) id = a.rest
+					else error = "Invalid ID. IDs are numbers, you can right click on things and get their IDs by turning on Developer Mode."
+				}
+				when("unix"){
+					try{
+						id = DiscordObject.millisToId(a.rest.toLong())
+					}catch (ex){
+						error = "Invalid Unix timestamp. https://en.wikipedia.org/wiki/Unix_time"
+					}
+				}
+				when("multiplier"){
+					try{
+						id = ((message.channel.id.toLong() *
+							new BigDecimal(a.rest)) as long).toString()
+						if (id > message.id) error = "The multiplier seems to be too big."
+					}catch (NumberFormatException ex){
+						error = "Invalid multiplier. Needs to be a decimal number with a period instead of a comma."
+					}
+				}
+				when("date"){
+					if (a.rest ==~ /\d+(\-\d+)*/){
+						List order = ["yyyy", "MM", "dd", "HH", "mm", "ss", "SSS"]
+						String format = order.subList(0, a.rest.count('-') + 1).join('-') + ' z'
+						long date = new SimpleDateFormat(format).parse(a.rest + " UTC").time
+
+						if (date < message.channel.createTimeMillis) id = message.channel.id
+						else id = DiscordObject.millisToId(date)
+					}else{
+						error = "Invalid date. Every number has to be separated by a dash character. The order is year, month, day, hour, minute, second and millisecond. If the year is 2016, it cannot be represented as 16."
+					}
+				}
+				otherwise {
+					error = "Invalid arguments."
+				}
+			}
+		}
+
+		if (error){
+			sendMessage("> $error".block("accesslog"))
+			return
+		}
+	}else id = message.id
+
+	SimpleDateFormat df = new SimpleDateFormat("HH:mm:ss")
+	String a = ""
+	message.channel.requestLogs(number, id, after).reverse().each {
+		String m = "[${df.format(it.timestamp ?: it.createTime)}] [$it.author.name]: $it.content"
+		if (it.attachments) m += " (attached: ${it.attachments.collect { it.url }.join(", ")})"
+		m = m.replaceAll(/(?!\r)\n/, "\r\n")
+		m += "\r\n"
+		a += m
+	}
+	a = a.replace("`", "‘")
+	if (a.size() > 1200) sendFile(a.getBytes("UTF-8"), filename: "logs-$id-$number-${after ? "after" : "before"}.txt")
+	else sendMessage(a.block("accesslog"))
+}
+
+bot.command(["jsonize", "jsonify"],
+	group: "Useful",
 	description: "Appropriates a string for JSON, filling in \\u, \\r, \\n, \\t and whatnot.",){
-	sendMessage(("> " + JSONUtil.json(args)).block("verilog"))
+	sendMessage(("> " + JSONUtil.json(args)).block("accesslog"))
 }
 
 bot.command(["brainfuck", "bf"],
-	group: "Misc",
+	group: "Useful",
 	description: "Interprets Brainfuck code. I normally wouldn't have added this but I wrote the interpreter myself, and considering the lack of self esteem I have I really liked that it worked.",
 	usages: [
 		" (code)": "Interprets the code."
@@ -1265,18 +1368,18 @@ bot.command(["brainfuck", "bf"],
 		|%s
 		|> Steps: %d, stack position: %d""".stripMargin(),
 			intrp.interpret(args), intrp.steps,
-			intrp.stackPosition).block("verilog"))
+			intrp.stackPosition).block("accesslog"))
 		done = true
 	}
 	Thread.sleep(5000)
 	if (!done){
 		a.interrupt()
-		sendMessage("> Evaluation took longer than 5 seconds. Total of $intrp.steps steps and stack position is $intrp.stackPosition.".block("verilog"))
+		sendMessage("> Evaluation took longer than 5 seconds. Total of $intrp.steps steps and stack position is $intrp.stackPosition.".block("accesslog"))
 	}
 }
 
 bot.command(["putlocker", "pl"],
-	group: "Misc",
+	group: "Entertainment",
 	description: "Searches putlocker.is for movies and TV shows.",
 	usages: [
 		" (query)": "Searches with given query."
@@ -1298,14 +1401,15 @@ findCommand = { String name ->
 formatCommand = { Command command,
 	String preferredTrigger = command.triggers.find { !it.regex },
 	String preferredName = command.aliases.find { !it.regex } ->
-	def output = """> ${command.aliases.findAll { !it.regex }.collect { it.toString().surround '"' }.join(" or ")} ($command.group): $command.description
+	def output = command.info.deprecated ? "> This command is deprecated. Use |>$command.info.preferred instead." : """> ${command.aliases.findAll { !it.regex }.collect { it.toString().surround '"' }.join(" or ")} ($command.group): $command.description
+>${'-' * 20}<
 > Usage:
 ${command.usages.collect { k, v -> "\"$preferredTrigger$preferredName$k\": $v" }.join("\n")}"""
 	if (command.info.examples){
-		output += """\n> Examples:
+		output += """\n>${'-' * 20}<\n> Examples:
 ${command.examples.collect { "\"$preferredTrigger$preferredName$it\"" }.join("\n")}"""
 	}
-	output.block("verilog")
+	output.block("accesslog")
 }
 
 bot.command(["help", "commands"],
@@ -1326,17 +1430,23 @@ bot.command(["help", "commands"],
 			}
 			sendMessage("""> $group.name: $group.description
 > Commands:
-${aliases.collect { it.collect { it.toString().surround '"' }.join(" or ") }.join(", ")}""".block("verilog"))
+${aliases.collect { it.collect { it.toString().surround '"' }.join(" or ") }.join(", ")}""".block("accesslog"))
 		}else if (command){
-			sendMessage(formatCommand(command, usedTrigger.toString(), args))
+			String msg = formatCommand(command, usedTrigger.toString(), args)
+			if (msg.size() < 2000) sendMessage(msg)
+			else {
+				sendMessage("""${command.aliases.findAll { !it.regex }.collect { it.toString().surround '"' }.join(" or ")} ($command.group): $command.description
+>${'-' * 20}<
+The usage and the examples make this message more than 2000 characters, which is Discord's limit for messages. Unfortunately you have to use |>usage and |>examples separately.""".block("accesslog"))
+			}
 		}else{
-			sendMessage("> Command or group not found.".block("verilog"))
+			sendMessage("> Command or group not found.".block("accesslog"))
 		}
 	}else{
 		sendMessage("""> My prefixes are |> and ><, meaning when you call a command you have to put one of those before the command name (no space).
 > For example: "$usedTrigger$usedAlias" calls this command, and "$usedTrigger$usedAlias markov" calls this command with the arguments "markov".
 > Commands are sectioned via groups. Unfortunately I can't list every command here, so I'm just gonna list the groups and you can do "$usedTrigger$usedAlias <groupname>" to list its commands.
-${groups.collect { k, v -> "> $k: $v.description" }.join("\n")}""".block("verilog"))
+${groups.collect { k, v -> "> $k: $v.description" }.join("\n")}""".block("accesslog"))
 	}
 }
 
@@ -1346,7 +1456,38 @@ bot.command("command",
 	usages: [
 		" (command)": "Shows the description, usage and the examples (if any) of the command."
 	]){
-	sendMessage(formatCommand(command, usedTrigger.toString(), args))
+	def command = findCommand(args)
+	String msg = formatCommand(command, usedTrigger.toString(), args)
+	if (msg.size() < 2000) sendMessage(msg)
+	else {
+		sendMessage("""${command.aliases.findAll { !it.regex }.collect { it.toString().surround '"' }.join(" or ")} ($command.group): $command.description
+>${'-' * 20}<
+The usage and the examples make this message more than 2000 characters, which is Discord's limit for messages. Unfortunately you have to use |>usage and |>examples separately.""".block("accesslog"))
+	}
+}
+
+bot.command("usage",
+	group: "Meta",
+	description: "Shows how a command is used.",
+	usages: [
+		" (command)": "Shows the usage of the command."
+	]){
+	def command = findCommand(args)
+	sendMessage((command.info.deprecated ? "> This command is deprecated. Use $command.preferred instead." : """> Usage:
+${command.usages.collect { k, v -> "\"$usedTrigger$args$k\": $v" }.join("\n")}""").block("accesslog"))
+}
+
+bot.command("examples",
+	group: "Meta",
+	description: "Shows examples of how a command is used.",
+	usages: [
+		" (command)": "Shows some examples of the command. There might be none."
+	]){
+	def command = findCommand(args)
+	sendMessage((command.info.deprecated ? "> This command is deprecated. Use $command.preferred instead." :
+		command.info.examples ? """> Examples:
+${command.examples.collect { "\"$usedTrigger$args$it\"" }.join("\n")}""" :
+		"> This command has no examples.").block("accesslog"))
 }
 
 bot.initialize()

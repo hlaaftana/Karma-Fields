@@ -1138,7 +1138,7 @@ bot.command("purgeroles",
 }
 
 bot.command(["filterroles", "purgedroles"],
-	group: "Server",
+	group: "Administrative",
 	description: "Finds roles with specific filters. If no filters are given, all filters will be used.\n\n" +
 		"List of filters: ${roleOptions.keySet().join(", ")}",
 	usages: [

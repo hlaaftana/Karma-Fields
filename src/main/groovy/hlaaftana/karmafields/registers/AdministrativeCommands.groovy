@@ -53,7 +53,7 @@ class AdministrativeCommands {
 		}
 
 		bot.command(["modlog",
-			~/modlog\-?/],
+			~/modlog(\-)?/],
 			group: "Administrative",
 			description: "Adds the given channel as a mod log.",
 			usages: [
@@ -86,13 +86,14 @@ class AdministrativeCommands {
 		}
 
 		["guest", "member", "bot"].each { n ->
-			bot.command(n + "role",
+			bot.command(["${n}role",
+				~(n + /role(\-)?/)],
 				group: "Administrative",
 				description: "Sets or unsets the \"$n\" role for the server.",
 				usages: [
 					"": "Shows which role the $n role is set to.",
 					" (@rolemention or id or name)": "Sets the $n role to the specified role.",
-					" (invalid role identifier)": "Removes the $n role. This can be 0 or another number that isn't an ID or the name of a role that doesn't exist like 'remove'."
+					"-": "Removes the $n role."
 				],
 				allowsPermissions: true){
 				changeRole(it, n)
@@ -279,7 +280,7 @@ class AdministrativeCommands {
 					int days = captures[0].toInteger() ?: 0
 					List<Member> members
 					if (message.mentions.empty){
-						if ((now() - message.server.lastMember.createTime.time) >= 60_000 && !args.contains("regardless")){
+						if ((now() - message.server.lastMember.createdAt.time) >= 60_000 && !args.contains("regardless")){
 							decorate("The latest member, ${Util.formatFull(message.server.latestMember)}, joined more than 1 minute ago. To ban them regardless of that, type \"${usedTrigger}ban regardless\".")
 							return
 						}
@@ -324,7 +325,7 @@ class AdministrativeCommands {
 					int days = captures[0].toInteger() ?: 7
 					List<Member> members
 					if (message.mentions.empty){
-						if ((now() - message.server.lastMember.createTime.time) >= 60_000 && !args.contains("regardless")){
+						if ((now() - message.server.lastMember.createdAt.time) >= 60_000 && !args.contains("regardless")){
 							decorate("The latest member, ${Util.formatFull(message.server.latestMember)}, joined more than 1 minute ago. To ban them regardless of that, type \"${usedTrigger}ban regardless\".")
 							return
 						}
@@ -449,6 +450,11 @@ class AdministrativeCommands {
 			data.decorate("Unfortunately you don't seem to have Manage Roles.")
 			return
 		}
+		if (data.captures[0] == '-'){
+			data.message.server."${name}_role" = null
+			data.decorate("Current $name role removed.")
+			return
+		}
 		if (!data.args){
 			def role = data.message.server.role(
 				data.message.server."${name}_role")
@@ -466,17 +472,15 @@ class AdministrativeCommands {
 		Role role = data.message.roleMentions ?
 			data.message.roleMentions[0] :
 			data.message.server.role(data.args)
-		if (role?.locked)
+		if (!role)
+			data.decorate("Invalid role.")
+		else if (role?.locked)
 			data.decorate("Unfortunately that role is locked for me so I can't use it.")
 		else if (role?.isLockedFor(data.author))
 			data.decorate("Unfortunately the role is locked for you so I can't account you on permissions.")
 		else if (role){
 			data.message.server."${name}_role" = role.id
 			data.decorate("Role \"$role\" ($role.id) successfully added as $name role.")
-		}
-		else{
-			data.message.server."${name}_role" = null
-			data.decorate("${name.capitalize()} role removed.")
 		}
 	}
 

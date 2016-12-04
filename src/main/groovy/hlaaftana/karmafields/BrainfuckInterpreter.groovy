@@ -11,12 +11,12 @@ class BrainfuckInterpreter {
 	InfiniteList stack = new InfiniteList(0)
 	int stackPosition = 0
 
-	String interpret(String code){
-		interpret(toLists(code))
+	def interpret(String code, Modes mode = Modes.CHAR){
+		interpret(toLists(code), mode)
 	}
 
-	String interpret(List code){
-		String output = ""
+	def interpret(List code, Modes mode = Modes.CHAR){
+		List output = []
 		code.each { c ->
 			whatis(c){
 				when(List){
@@ -42,7 +42,7 @@ class BrainfuckInterpreter {
 					++steps
 				}
 				when ".": {
-					output += stack[stackPosition] as char
+					output += stack[stackPosition]
 					++steps
 				}
 				when ",": {
@@ -51,7 +51,7 @@ class BrainfuckInterpreter {
 				}
 			}
 		}
-		output
+		mode.run(output)
 	}
 
 	private static toLists(String bf){
@@ -70,5 +70,21 @@ class BrainfuckInterpreter {
 			}
 		}
 		a
+	}
+
+	enum Modes {
+		CHAR({ l -> l.collect { (it + 32) as char }.join("") }),
+		NUM({ l -> l }),
+		UNICODE({ l -> l.collect { it as char }.join("") })
+
+		Closure closure
+		Closure<String> joiner
+		Modes(Closure c){
+			closure = c
+		}
+
+		def run(o){
+			closure(o)
+		}
 	}
 }

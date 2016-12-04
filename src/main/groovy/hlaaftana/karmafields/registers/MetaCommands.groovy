@@ -45,7 +45,7 @@ class MetaCommands {
 				" (text)": "Sends me the text as feedback."
 			]){
 			try{
-				client.user(215942738670125059).sendMessage(
+				client.user(kf.me).sendMessage(
 					"> Feedback by ${Util.formatLongUser(message.author)}:\n$args"
 					.block("accesslog"))
 				decorate("Feedback sent.")
@@ -65,7 +65,7 @@ Author: ${Util.formatLongUser(kf.me)}
 Source code: "https://github.com/hlaaftana/Karma-Fields"
 Library: DiscordG ("https://github.com/hlaaftana/DiscordG")
 Memory usage: ${Runtime.runtime.totalMemory() / (1 << 20)}/${Runtime.runtime.maxMemory() / (1 << 20)}MB
-Invite: ${Util.formatUrl(client.appLink(client.app_id, 268435456))}""")
+Invite: ${Util.formatUrl(client.appLink(client.appId, 268435456))}""")
 		}
 
 		bot.command(["join", "invite"],

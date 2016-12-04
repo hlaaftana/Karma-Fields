@@ -29,7 +29,7 @@ class ServerCommands {
 				" red",
 				" navy blue"
 			],
-			allowsPermissions: true){
+			allowsPermissions: true){ d ->
 			if (!message.server){
 				decorate("We aren't in a server.")
 				return

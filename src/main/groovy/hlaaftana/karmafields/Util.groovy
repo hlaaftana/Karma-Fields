@@ -41,16 +41,20 @@ class Util {
 
 			modlog << { a ->
 				delegate.modlogs.each {
-					delegate.textChannel(it)?.sendMessage(a)
+					delegate.textChannel(it)?.decorate(a)
 				}
 			}
+		}
+		DiscordObject.metaClass.decorate = { a ->
+			client.sendMessage(delegate, ('> ' + a).replace('\n', '\n> ').block("accesslog"))
 		}
 		MiscUtil.registerStringMethods()
 		MiscUtil.registerCollectionMethods()
 	}
 
-	static OutputStream draw(int width = 256, int height = 256, Closure closure){
-		BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB)
+	static OutputStream draw(Map args = [:], Closure closure){
+		BufferedImage image = new BufferedImage(args.width ?: 256,
+			args.height ?: 256, args.colorType ?: BufferedImage.TYPE_INT_RGB)
 		Graphics2D graphics = image.createGraphics()
 		Closure ass = closure.clone()
 		ass.delegate = graphics
@@ -58,7 +62,7 @@ class Util {
 		ass(image)
 		graphics.dispose()
 		ByteArrayOutputStream baos = new ByteArrayOutputStream()
-		ImageIO.write(image, "png", baos)
+		ImageIO.write(image, args.imageType ?: "png", baos)
 		baos
 	}
 

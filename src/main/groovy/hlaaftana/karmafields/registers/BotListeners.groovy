@@ -1,9 +1,9 @@
 package hlaaftana.karmafields.registers
 
 import hlaaftana.discordg.Client
-import hlaaftana.discordg.Events
 import hlaaftana.discordg.exceptions.NoPermissionException
 import hlaaftana.discordg.util.JSONUtil
+import hlaaftana.discordg.util.MiscUtil
 import hlaaftana.discordg.util.bot.CommandBot
 import hlaaftana.karmafields.KarmaFields
 import hlaaftana.karmafields.Util
@@ -14,14 +14,14 @@ class BotListeners {
 	static register(KarmaFields kf){
 		Client client = kf.client
 
-		client.fields.lastWarned = false
+		client.fields.lockedRoleLastWarned = [:]
 
-		client.listener(Events.SERVER){
-			try{
+		client.listener("SERVER"){
+			MiscUtil.defaultValueOnException {
 				server.role("|><|")?.edit(color: 0x0066c2)
-			}catch (NoPermissionException ex){}
-			server.sendMessage(
-				"> Looks like I joined. Yay. Do |>help for commands.".block("accesslog"))
+			}
+
+			server.decorate("Looks like I joined. Yay. Do |>help or ><help for commands.")
 			File a = new File("guilds/${server.id}.json")
 			a.createNewFile()
 			if (a.text == ""){
@@ -29,54 +29,44 @@ class BotListeners {
 			}
 		}
 
-		client.listener(Events.ROLE_UPDATE){
-			if (!role.locked ||
-				(!Util.serverJson(json.guild_id).member_role &&
-					!Util.serverJson(json.guild_id).bot_role &&
-					!Util.serverJson(json.guild_id).guest_role)) return
-			if (client.lastWarned) return
-			client.lastWarned = true
-			whatis(json.role.id){
-				when(Util.serverJson(json.guild_id).member_role){
-					server.sendMessage(("> This server's member role ($role) is now locked for me. " +
-						"Please set a new member role using |>memberrole or give me a role with a higher position.").block("accesslog"))
-				}
-
-				when(Util.serverJson(json.guild_id).bot_role){
-					server.sendMessage(("> This server's bot role ($role) is now locked for me. " +
-						"Please set a new bot role using |>botrole or give me a role with a higher position.").block("accesslog"))
-				}
-
-				when(Util.serverJson(json.guild_id).guest_role){
-					server.sendMessage(("> This server's guest role ($role) is now locked for me. " +
-						"Please set a new guest role using |>guestrole or give me a role with a higher position.").block("accesslog"))
+		client.listener("ROLE_UPDATE"){
+			if (!server.member_role &&
+				!server.bot_role &&
+				!server.guest_role) return
+			whatis(role.id){
+				["member", "guest", "bot"].each { x ->
+					when(server."${x}_role"){
+						if (role.locked){
+							if (!client.lockedRoleLastWarned[role.id]){
+								server.decorate("This server's $x role " +
+									"(${Util.formatFull(role)}) is now " +
+									"locked for me. Please set a new $x role " +
+									"using |>${x}role or give me a role with " +
+									"a higher position.")
+								client.lockedRoleLastWarned[role.id] = true
+							}
+						}else client.lockedRoleLastWarned[role.id] = false
+					}
 				}
 			}
 		}
 
-		client.listener(Events.ROLE_DELETE){
-			if (!Util.serverJson(json.guild_id).member_role &&
-				!Util.serverJson(json.guild_id).bot_role &&
-				!Util.serverJson(json.guild_id).guest_role) return
+		client.listener("ROLE_DELETE"){
+			if (!server.member_role &&
+				!server.bot_role &&
+				!server.guest_role) return
 			whatis(json.role_id){
-				when(Util.serverJson(json.guild_id).member_role){
-					server.sendMessage(("> This server's member role ($role) is now deleted. " +
-						"Please set a new member role using |>memberrole.").block("accesslog"))
-				}
-
-				when(Util.serverJson(json.guild_id).bot_role){
-					server.sendMessage(("> This server's bot role ($role) is now deleted. " +
-						"Please set a new bot role using |>botrole.").block("accesslog"))
-				}
-
-				when(Util.serverJson(json.guild_id).guest_role){
-					server.sendMessage(("> This server's guest role ($role) is now deleted. " +
-						"Please set a new guest role using |>guestrole.").block("accesslog"))
+				["member", "guest", "bot"].each { x ->
+					when(server."${x}_role"){
+						server.decorate("This server's $x role (${Util.formatFull(role)})" +
+							" is now deleted. " +
+							"Please set a new $x role using |>${x}role.")
+					}
 				}
 			}
 		}
 
-		client.listener(Events.MESSAGE){
+		kf.bot.listenerSystem.addListener(CommandBot.Events.NO_COMMAND){
 			kf.markovFileThreadPool.submit {
 				File file = new File("markovs/${json.author.id}.txt")
 				if (!file.exists()) file.createNewFile()
@@ -84,43 +74,28 @@ class BotListeners {
 			}
 		}
 
-		String latestId
-		client.listener(Events.MEMBER){
-			if (latestId == member.id) return
-			else latestId = member.id
-			if (server.id in ["145904657833787392", "195223058544328704", "198882877520216064"]){
-				String message = """\
-> A member just joined:
-> Name: $member.name
-> ID: $member.id
-> Account creation time: $member.createTime
-> To member, type |>member, to ban, type |>ban, to bot, type |>bot.""".block("accesslog")
-				server.defaultChannel.sendMessage(message)
-				server.modlog(message)
-			}
+		client.listener("MEMBER"){
 			["guest", "member"].each { n ->
 				if (server."auto$n" && !(member.bot && server.autobot)){
 					try{
 						member.addRole(server."${n}_role")
 					}catch (NoPermissionException ex){
-						server.sendMessage(
-							"> I tried to auto$n ${Util.formatFull(member)} but I seem to not have permissions."
-							.block("accesslog"))
+						server.decorate("I tried to auto$n ${Util.formatFull(member)} " +
+							"but I seem to not have permissions.")
 						return
 					}
-					server.modlog("> Auto${n}ed ${Util.formatFull(member)}.".block("accesslog"))
+					server.modlog("Auto${n}ed ${Util.formatFull(member)}.")
 				}
 			}
 			if (server.autobot && member.bot){
 				try{
 					member.addRole(server.bot_role)
 				}catch (NoPermissionException ex){
-					server.sendMessage(
-						"> I tried to autobot ${Util.formatFull(member)} but I seem to not have permissions."
-						.block("accesslog"))
+					server.decorate("I tried to autobot ${Util.formatFull(member)} " +
+						"but I seem to not have permissions.")
 					return
 				}
-				server.modlog("> Autobotted ${Util.formatFull(member)}.".block("accesslog"))
+				server.decorate("> Autobotted ${Util.formatFull(member)}.".block("accesslog"))
 			}
 		}
 	}

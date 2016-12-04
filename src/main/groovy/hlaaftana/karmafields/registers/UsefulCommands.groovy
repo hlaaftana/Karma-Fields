@@ -6,6 +6,7 @@ import hlaaftana.discordg.exceptions.NoPermissionException
 import hlaaftana.discordg.objects.DiscordObject
 import hlaaftana.discordg.objects.Member
 import hlaaftana.discordg.objects.Message
+import hlaaftana.discordg.util.ConversionUtil
 import hlaaftana.discordg.util.JSONUtil
 import hlaaftana.discordg.util.MiscUtil
 import static hlaaftana.discordg.util.WhatIs.whatis
@@ -65,7 +66,7 @@ class UsefulCommands {
 			String dea = args
 				.replaceAll(/^```\w*\n/, "")
 				.replaceAll(/```$/, "")
-			if (json.author.id in ["98457401363025920", "215942738670125059"] &&
+			if (json.author.id == kf.me.id &&
 				usedTrigger.toString() != "><"){
 				try{
 					sendMessage(("> " + new GroovyShell(
@@ -151,11 +152,19 @@ class UsefulCommands {
 				"": "Looks up most recent posts.",
 				" first": "Looks up first posts.",
 				" id (id)": "Looks up posts at the ID given.",
-				" date (year-month-day-...)": "Looks up posts at the given date (UTC). Every part of the part before is separated by a dash. The progression is year, month, day, hour, minute, second and millisecond. Keep in mind that 2016 works but 16 has problems. Check examples if you're confused.",
+				" date (year-month-day-...)": "Looks up posts at the given date (UTC). " +
+					"Every part of the part before is separated by a dash. " +
+					"The progression is year, month, day, hour, minute, second and " +
+					"millisecond. Keep in mind that '2016' works but '16' has problems. " +
+					"Check examples if you're confused.",
 				" unix (timestamp)": "Looks up posts at the given Unix timestamp.",
-				" multiplier (multiplier)": "Multiplies the channel id by the given multiplier and looks up messages at that ID. Shouldn't be more than 2, unless the channel is old Discord-creation-wise.",
-				"<(number)> (arguments)": "Sets the post number, not more than 100. Arguments can be any of the above.",
-				"+ (arguments)": "Shows posts after the given time. Otherwise before. Does not work for first."
+				" multiplier (multiplier)": "Multiplies the channel id by the given " +
+					"multiplier and looks up messages at that ID. Shouldn't be more than " +
+					"2, unless the channel is old Discord-creation-wise.",
+				"<(number)> (arguments)": "Sets the post number, not more than 100. " +
+					"Arguments can be any of the above.",
+				"+ (arguments)": "Shows posts after the given time. Otherwise before. " +
+					"Does not work for first."
 			],
 			examples: [
 				"<25>",
@@ -173,71 +182,70 @@ class UsefulCommands {
 			int number = maddy ? Math.min(maddy.toInteger(), 100) : 50
 			boolean after = captures.any { it == "+" }
 			String id
-			if (args){
-				String error
-				argp(args){ Arguments a ->
-					String choice = a.afterSpace
-					whatis(choice){
-						when("first"){
-							id = message.channel.id
-							after = true
-						}
-						when("id"){
-							if (a.rest.long) id = a.rest
-							else error = "Invalid ID. IDs are numbers, you can right click on things and get their IDs by turning on Developer Mode."
-						}
-						when("unix"){
-							try{
-								id = DiscordObject.millisToId(a.rest.toLong())
-							}catch (ex){
-								error = "Invalid Unix timestamp. https://en.wikipedia.org/wiki/Unix_time"
-							}
-						}
-						when("multiplier"){
-							try{
-								id = ((message.channel.id.toLong() *
-									new BigDecimal(a.rest)) as long).toString()
-								if (id > message.id) error = "The multiplier seems to be too big."
-							}catch (NumberFormatException ex){
-								error = "Invalid multiplier. Needs to be a decimal number with a period instead of a comma."
-							}
-						}
-						when("date"){
-							if (a.rest ==~ /\d+(\-\d+)*/){
-								List order = ["yyyy", "MM", "dd", "HH", "mm", "ss", "SSS"]
-								String format = order.subList(0, a.rest.count('-') + 1).join('-') + ' z'
-								long date = new SimpleDateFormat(format).parse(a.rest + " UTC").time
-
-								if (date < message.channel.createTimeMillis) id = message.channel.id
-								else id = DiscordObject.millisToId(date)
-							}else{
-								error = "Invalid date. Every number has to be separated by a dash character. The order is year, month, day, hour, minute, second and millisecond. If the year is 2016, it cannot be represented as 16."
-							}
-						}
-						otherwise {
-							error = "Invalid arguments."
-						}
+			String error
+			Arguments a = new Arguments(args)
+			String choice = args ? a.afterSpace : "first"
+			whatis(choice){
+				when("first"){
+					id = message.channel.id
+					after = true
+				}
+				when("id"){
+					if (a.rest.long) id = a.rest
+					else error = "Invalid ID. IDs are numbers, you can right click on things and get their IDs by turning on Developer Mode."
+				}
+				when("unix"){
+					try{
+						id = DiscordObject.millisToId(a.rest.toLong())
+					}catch (ex){
+						error = "Invalid Unix timestamp. https://en.wikipedia.org/wiki/Unix_time"
 					}
 				}
-
-				if (error){
-					decorate(error)
-					return
+				when("multiplier"){
+					try{
+						id = ((message.channel.id.toLong() *
+							new BigDecimal(a.rest)) as long).toString()
+						if (id > message.id) error = "The multiplier seems to be too big."
+					}catch (NumberFormatException ex){
+						error = "Invalid multiplier. Needs to be a decimal number " +
+							"with a period instead of a comma."
+					}
 				}
-			}else id = message.id
+				when("date"){
+					if (a.rest ==~ /\d+(\-\d+)*/){
+						long date = ConversionUtil.experimentalDateParser(a.rest).time
+						if (date < message.channel.createdAtMillis) id = message.channel.id
+						else id = DiscordObject.millisToId(date)
+					}else{
+						error = "Invalid date. Every number has to be separated by " +
+							"a dash character. The order is year, month, day, hour," +
+							" minute, second and millisecond. If the year is 2016, " +
+							"it cannot be represented as 16."
+					}
+				}
+				otherwise {
+					error = "Invalid arguments."
+				}
+			}
+
+			if (error){
+				decorate(error)
+				return
+			}
 
 			SimpleDateFormat df = new SimpleDateFormat("HH:mm:ss")
-			String a = ""
+			df.timeZone = TimeZone.getTimeZone("Etc/UTC")
+			String t = ""
 			message.channel.requestLogs(number, id, after).reverse().each {
-				String m = "[${df.format(it.timestamp ?: it.createTime)}] [$it.author.name]: $it.content"
+				String m = "[${df.format(it.timestamp ?: it.createdAt)}] [$it.author.name]: $it.content"
 				if (it.attachments) m += " (attached: ${it.attachments.collect { it.url }.join(", ")})"
 				m = m.replaceAll(/(?!\r)\n/, "\r\n")
 				m += "\r\n"
-				a += m
+				t += m
 			}
-			a = a.replace("`", "‘")
-			if (a.size() > 1200) sendFile(a.getBytes("UTF-8"), filename: "logs-$id-$number-${after ? "after" : "before"}.txt")
-			else sendMessage(a.block("accesslog"))
+			t = t.replace("`", "‘")
+			if (t.size() > 1200) sendFile(t.getBytes("UTF-8"), "logs-$id-$number-${after ? "after" : "before"}.txt")
+			else sendMessage(t.block("accesslog"))
 		}
 
 		bot.command(["jsonize", "jsonify"],
@@ -246,28 +254,39 @@ class UsefulCommands {
 			decorate(JSONUtil.json(args))
 		}
 
-		bot.command(["brainfuck", "bf"],
+		bot.command(["brainfuck", "bf",
+			~/(?:brainfuck|bf)<(\w+)>/],
 			group: "Useful",
-			description: "Interprets Brainfuck code. I normally wouldn't have added this but I wrote the interpreter myself, and considering the lack of self esteem I have I really liked that it worked.",
+			description: "Interprets Brainfuck code.",
 			usages: [
-				" (code)": "Interprets the code."
+				" (code)": "Interprets the code.",
+				"<(mode)> (code)": "Interprets the code and prints the output with " +
+					"the given mode. Default mode is char, other modes are unicode and num." +
+					" unicode converts the stack to Unicode characters, char adds 32 and " +
+					"converts them, while num outputs the number values of the stack.",
 			]){
+			BrainfuckInterpreter.Modes mode = BrainfuckInterpreter.Modes.
+				"${(captures[0] ?: "CHAR").toUpperCase()}"
 			def intrp = new BrainfuckInterpreter()
 			boolean done
 			Thread a = Thread.start {
+				def r = intrp.interpret(args, mode)
 				sendMessage(String.format("""\
 					|> Output:
 					|%s
-					|> Steps: %d, stack position: %d""".stripMargin(),
-					intrp.interpret(args), intrp.steps,
-					intrp.stackPosition).block("accesslog"))
+					|> Steps: %d, stack position: %d
+					|> Stack: %s""".stripMargin(),
+					JSONUtil.json(r), intrp.steps, intrp.stackPosition,
+					intrp.stack.changedValues.collect { k, v -> "[$k:$v]" }
+						.join(" ")).block("accesslog"))
 				done = true
 			}
 			Thread.sleep(5000)
 			if (!done){
 				a.interrupt()
-				decorate("Evaluation took longer than 5 seconds. " +
-					"Total of $intrp.steps steps and stack position is $intrp.stackPosition.")
+				decorate("Evaluation took longer than 5 seconds.\n" +
+					"Steps: $intrp.steps, stack position: $intrp.stackPosition\n" +
+					"Stack: " + intrp.stack.changedValues.collect { k, v -> "[$k:$v]" }.join(" "))
 			}
 		}
 	}
@@ -275,7 +294,7 @@ class UsefulCommands {
 	static OutputStream drawColor(int clr, int width, int height){
 		width = Math.min(width, 2500)
 		height = Math.min(height, 2500)
-		Util.draw(width, height){
+		Util.draw(width: width, height: height){
 			Color c = new Color(clr)
 			int rgb = (c.RGB << 8) >>> 8
 			color = c

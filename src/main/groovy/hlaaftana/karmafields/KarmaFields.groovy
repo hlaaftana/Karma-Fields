@@ -1,7 +1,6 @@
 package hlaaftana.karmafields
 
 import hlaaftana.discordg.Client
-import hlaaftana.discordg.Events
 import hlaaftana.discordg.util.Log
 import hlaaftana.discordg.util.bot.*
 import hlaaftana.karmafields.registers.*
@@ -38,20 +37,20 @@ class KarmaFields {
 		client.eventThreadCount = 4
 
 		me.serverTimeout *= 4
-		me.includedEvents = [Events.SERVER, Events.CHANNEL, Events.ROLE,
-			Events.MEMBER, Events.MESSAGE]
+		me.includedEvents = ["SERVER", "CHANNEL", "ROLE",
+			"MEMBER", "MESSAGE"]
 		me.excludedEvents = null
 
-		me.listener(Events.READY){
+		me.listener("READY"){
 			if (!meReady){
-				client.fields.app_id = Util.creds.app_id
+				client.fields.appId = Util.creds.app_id
 				bot.triggers += client.mentionRegex
 				meReady = true
 				println "--- Fully loaded. ---"
 			}
 		}
 
-		client.listener(Events.READY){
+		client.listener("READY"){
 			client.play("⌀")
 			if (!botReady){
 				if (!me.token){
@@ -64,8 +63,6 @@ class KarmaFields {
 		bot = new CommandBot(triggers: ["|>", "><"], client: client,
 			extraCommandArgs: [decorate: { e -> { a -> e.sendMessage(
 				('> ' + a).replace('\n', '\n> ').block("accesslog")) } }])
-
-		BotListeners.register(this)
 	}
 
 	Command findCommand(String name){

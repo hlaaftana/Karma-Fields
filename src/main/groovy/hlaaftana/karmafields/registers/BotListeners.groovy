@@ -16,7 +16,7 @@ class BotListeners {
 
 		client.fields.lockedRoleLastWarned = [:]
 
-		client.listener("SERVER"){
+		client.listener("server"){
 			MiscUtil.defaultValueOnException {
 				server.role("|><|")?.edit(color: 0x0066c2)
 			}
@@ -29,7 +29,7 @@ class BotListeners {
 			}
 		}
 
-		client.listener("ROLE_UPDATE"){
+		client.listener("role_update"){
 			if (!server.member_role &&
 				!server.bot_role &&
 				!server.guest_role) return
@@ -51,7 +51,7 @@ class BotListeners {
 			}
 		}
 
-		client.listener("ROLE_DELETE"){
+		client.listener("role_delete"){
 			if (!server.member_role &&
 				!server.bot_role &&
 				!server.guest_role) return
@@ -66,15 +66,15 @@ class BotListeners {
 			}
 		}
 
-		kf.bot.listenerSystem.addListener(CommandBot.Events.NO_COMMAND){
+		kf.bot.listenerSystem.addListener(CommandBot.Events.NO_COMMAND){ d ->
 			kf.markovFileThreadPool.submit {
-				File file = new File("markovs/${json.author.id}.txt")
+				File file = new File("markovs/${d.json.author.id}.txt")
 				if (!file.exists()) file.createNewFile()
-				file.append(json.content + "\n", "UTF-8")
+				file.append(d.json.content + "\n", "UTF-8")
 			}
 		}
 
-		client.listener("MEMBER"){
+		client.listener("member"){
 			["guest", "member"].each { n ->
 				if (server."auto$n" && !(member.bot && server.autobot)){
 					try{

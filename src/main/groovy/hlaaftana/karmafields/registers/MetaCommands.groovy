@@ -25,6 +25,9 @@ class MetaCommands {
 		Server: [
 			description: "Commands to use in servers, but not necessarily administrative."
 		],
+		'Cookie-cutter': [
+			description: "Commands you can find in other bots, or commands that lack in use."
+		],
 		Misc: [
 			description: "Uncategorized commands."
 		]

@@ -70,7 +70,7 @@ class UsefulCommands {
 				usedTrigger.toString() != "><"){
 				try{
 					sendMessage(("> " + new GroovyShell(
-						new Binding(d + [data: d,
+						new Binding(d + [data: d, kf: kf,
 							now: System.&currentTimeMillis] +
 							kf.properties +
 								Util.metaClass.methods.collectEntries {
@@ -104,7 +104,7 @@ class UsefulCommands {
 					sendMessage(output)
 				}catch (ex){
 					Message dong = decorate("Message too long. Uploading JSON result of evaluation...")
-					sendFile(JSONUtil.dump("temp/evaluation_${message.id}.json", evaluation))
+					sendFile(JSONUtil.pjson(evaluation).getBytes("UTF-8"), "evaluation_${message.id}.json")
 					dong.delete()
 				}
 			}
@@ -248,12 +248,6 @@ class UsefulCommands {
 			else sendMessage(t.block("accesslog"))
 		}
 
-		bot.command(["jsonize", "jsonify"],
-			group: "Useful",
-			description: "Appropriates a string for JSON, filling in \\u, \\r, \\n, \\t and whatnot.",){
-			decorate(JSONUtil.json(args))
-		}
-
 		bot.command(["brainfuck", "bf",
 			~/(?:brainfuck|bf)<(\w+)>/],
 			group: "Useful",
@@ -289,11 +283,36 @@ class UsefulCommands {
 					"Stack: " + intrp.stack.changedValues.collect { k, v -> "[$k:$v]" }.join(" "))
 			}
 		}
+
+		bot.command("mymessages",
+			group: "Useful",
+			description: "Gives (information about) your messages that I have logged.",
+			usages: [
+				"": "Sends you your log file.",
+				" count (text)": "Counts how many times you said the given phrase.",
+				" countignorecase (text)": "Counts how many times you said the given " +
+					"phrase, but ignores character case."
+			]){
+			File file = new File("markovs/${json.author.id}.txt")
+			if (!file.exists()) decorate("I haven't logged any of your messages.")
+			else if (!args) sendFile(file)
+			else {
+				Arguments a = new Arguments(args)
+				def choice = a.afterSpace
+				if (choice == "count")
+					decorate("I have found the phrase \"$a.rest\" " +
+						file.text.count(a.rest) + " times in your messages.")
+				else if (choice == "countignorecase")
+					decorate("I have found the phrase \"$a.rest\" " +
+						file.text.toLowerCase().count(a.rest.toLowerCase()) +
+						" times in your messages.")
+			}
+		}
 	}
 
 	static OutputStream drawColor(int clr, int width, int height){
-		width = Math.min(width, 2500)
-		height = Math.min(height, 2500)
+		width = Math.max(Math.min(width, 2500), 120)
+		height = Math.max(Math.min(height, 2500), 120)
 		Util.draw(width: width, height: height){
 			Color c = new Color(clr)
 			int rgb = (c.RGB << 8) >>> 8

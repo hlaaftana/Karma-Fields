@@ -19,7 +19,6 @@ class Arguments {
 		String ret = ""
 		while (true){
 			if (index == raw.size()){
-				--index
 				break
 			}
 			if (Character.isSpaceChar(now[index] as char)){

@@ -61,6 +61,10 @@ class AdministrativeCommands {
 				"- (#channel or id or name)": "Removes the channel from the mod log channels."
 			],
 			allowsPermissions: true){
+			if (!message.server){
+				decorate("We're not in a server.")
+				return
+			}
 			def channel = message.channelMentions ?
 				message.channelMentions[0] :
 				message.server.channel(args)
@@ -96,6 +100,10 @@ class AdministrativeCommands {
 					"-": "Removes the $n role."
 				],
 				allowsPermissions: true){
+				if (!message.server){
+					decorate("We're not in a server.")
+					return
+				}
 				changeRole(it, n)
 			}
 		}
@@ -111,6 +119,10 @@ class AdministrativeCommands {
 					" toggle": "Toggles auto${n}ing."
 				],
 				allowsPermissions: true){
+				if (!message.server){
+					decorate("We're not in a server.")
+					return
+				}
 				autoRole(it, n)
 			}
 		}
@@ -125,6 +137,10 @@ class AdministrativeCommands {
 				" toggle": "Toggles autobotting."
 			],
 			allowsPermissions: true){
+			if (!message.server){
+				decorate("We're not in a server.")
+				return
+			}
 			if (!args){
 				decorate("Autobot is currently " +
 					"${message.server.autobot ? "on" : "off"}.")
@@ -164,6 +180,10 @@ class AdministrativeCommands {
 				" (@mentions)": "Guests every user mentioned."
 			],
 			allowsPermissions: true){
+			if (!message.server){
+				decorate("We're not in a server.")
+				return
+			}
 			if (!author.permissions["manageRoles"])
 				decorate("You don't have sufficient permissions.")
 			else if (!message.server.member_role)
@@ -198,6 +218,10 @@ class AdministrativeCommands {
 				" (@mentions)": "Members every user mentioned."
 			],
 			allowsPermissions: true){
+			if (!message.server){
+				decorate("We're not in a server.")
+				return
+			}
 			if (!author.permissions["manageRoles"])
 				decorate("You don't have sufficient permissions.")
 			else if (!message.server.member_role)
@@ -232,6 +256,10 @@ class AdministrativeCommands {
 				" (@mentions)": "Bots every user mentioned."
 			],
 			allowsPermissions: true){
+			if (!message.server){
+				decorate("We're not in a server.")
+				return
+			}
 			if (!author.permissions["manageRoles"]){
 				decorate("You don't have sufficient permissions.")
 			}else if (!message.server.bot_role){
@@ -275,6 +303,10 @@ class AdministrativeCommands {
 				"<3> @hlaaf#7436"
 			],
 			allowsPermissions: true){
+			if (!message.server){
+				decorate("We're not in a server.")
+				return
+			}
 			if (author.permissions["ban"]){
 				try{
 					int days = captures[0].toInteger() ?: 0
@@ -320,6 +352,10 @@ class AdministrativeCommands {
 			],
 			hide: true,
 			allowsPermissions: true){
+			if (!message.server){
+				decorate("We're not in a server.")
+				return
+			}
 			if (author.permissions["ban"]){
 				try{
 					int days = captures[0].toInteger() ?: 7
@@ -361,6 +397,10 @@ class AdministrativeCommands {
 				" unused no_overwrites"
 			],
 			allowsPermissions: true){
+			if (!message.server){
+				decorate("We're not in a server.")
+				return
+			}
 			if (!author.permissions["manageRoles"]){
 				decorate("You don't have sufficient permissions. Ask a staff " +
 					"member to call this command to do what you want.")
@@ -419,6 +459,10 @@ class AdministrativeCommands {
 				" color",
 				" unused no_overwrites"
 			]){
+			if (!message.server){
+				decorate("We're not in a server.")
+				return
+			}
 			def options = []
 			if (args){
 				boolean neg = false

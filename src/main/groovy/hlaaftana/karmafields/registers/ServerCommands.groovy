@@ -50,7 +50,7 @@ class ServerCommands {
 					it.hoist || !(it.name ==~ /#?[0-9a-fA-F]+/) ||
 					it.name.contains(" ") ||
 					it.permissionValue > a ||
-					!(it.permissionValue == 0) ? 1 : 0 }
+					it.permissionValue != 0 ? 1 : 0 }
 				// 0 is color roles, 1 is the others
 				boolean created
 				Role role

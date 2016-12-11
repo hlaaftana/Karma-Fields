@@ -1,6 +1,7 @@
 package hlaaftana.karmafields
 
 import hlaaftana.discordg.Client
+import hlaaftana.discordg.exceptions.MessageInvalidException
 import hlaaftana.discordg.util.Log
 import hlaaftana.discordg.util.bot.*
 import hlaaftana.karmafields.registers.*
@@ -17,31 +18,30 @@ class KarmaFields {
 	CommandBot bot
 	CleverbotDotIO cleverbot = new CleverbotDotIO(Util.creds.cb_user,
 		Util.creds.cb_key)
-	YandexDictionary yandexDict = new YandexDictionary(key: Util.creds.yandex_dict_key)
 	ExecutorService markovFileThreadPool = Executors.newFixedThreadPool(5)
 
 	KarmaFields(){
-		[client, me].each { Client c ->
-			c.log.debug.enable()
-			c.log.formatter = { Log.Message message ->
+		[client, me].each { Client c -> c.with {
+			log.debug.enable()
+			log.formatter = { Log.Message message ->
 				String.format("[%s] [%s]: %s",
 					message.level.name.toUpperCase(),
 					message.sender, message.content)
 			}
-			c.http.ptb()
-			c.http.baseUrl += "v6/"
-			c.addReconnector()
-		}
+			http.ptb()
+			http.baseUrl += "v6/"
+			addReconnector()
+		} }
 
 		client.mute("81402706320699392", "119222314964353025")
 		client.eventThreadCount = 4
 
 		me.serverTimeout *= 4
-		me.includedEvents = ["SERVER", "CHANNEL", "ROLE",
-			"MEMBER", "MESSAGE"]
-		me.excludedEvents = null
+		me.includedEvents = ["server", "channel", "role",
+			"member", "message"]
+		me.excludedEvents = []
 
-		me.listener("READY"){
+		me.listener("ready"){
 			if (!meReady){
 				client.fields.appId = Util.creds.app_id
 				bot.triggers += client.mentionRegex
@@ -50,7 +50,7 @@ class KarmaFields {
 			}
 		}
 
-		client.listener("READY"){
+		client.listener("ready"){
 			client.play("⌀")
 			if (!botReady){
 				if (!me.token){
@@ -61,8 +61,9 @@ class KarmaFields {
 		}
 
 		bot = new CommandBot(triggers: ["|>", "><"], client: client,
-			extraCommandArgs: [decorate: { e -> { a -> e.sendMessage(
-				('> ' + a).replace('\n', '\n> ').block("accesslog")) } }])
+			extraCommandArgs: [decorate: { e -> e.channel.&decorate }],
+			errorResponses: [(MessageInvalidException):
+				{ channel.decorate("Unfortunately my message was too long.") }])
 	}
 
 	Command findCommand(String name){
@@ -78,7 +79,8 @@ class KarmaFields {
 		bot.loggedIn = true
 
 		[BotListeners, MetaCommands, ServerCommands, EntertainmentCommands,
-			AdministrativeCommands, UsefulCommands, MiscCommands].each {
+			AdministrativeCommands, UsefulCommands,
+			MiscCommands, CookieCutterCommands].each {
 			it.register(this)
 		}
 

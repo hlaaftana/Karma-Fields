@@ -46,7 +46,7 @@ class Util {
 			}
 		}
 		DiscordObject.metaClass.decorate = { a ->
-			client.sendMessage(delegate, ('> ' + a).replace('\n', '\n> ').block("accesslog"))
+			delegate.client.sendMessage(delegate, ('> ' + a).replace('\n', '\n> ').block("accesslog"))
 		}
 		MiscUtil.registerStringMethods()
 		MiscUtil.registerCollectionMethods()

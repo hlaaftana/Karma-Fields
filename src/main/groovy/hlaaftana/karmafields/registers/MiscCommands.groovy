@@ -59,5 +59,12 @@ class MiscCommands {
 				}
 			}
 		}
+
+		bot.command(["hidemarkov", "hm"],
+			group: "Misc",
+			description: "Empty and functionless command to hide a message from the markov logs.",
+			usages: [
+				" (text)": "Does nothing."
+			]){}
 	}
 }

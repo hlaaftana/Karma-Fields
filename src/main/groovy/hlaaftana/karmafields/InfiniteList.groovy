@@ -32,7 +32,7 @@ class InfiniteList extends AbstractList {
 	String toString(){
 		def a = changedValues.collect { k, v -> ", $k: $v" }
 		"InfiniteList[default: $defaultValue" +
-			(a.join("") ?: "") + "]"
+			(a.join() ?: '') + ']'
 	}
 
 	boolean isEmpty(){ false }

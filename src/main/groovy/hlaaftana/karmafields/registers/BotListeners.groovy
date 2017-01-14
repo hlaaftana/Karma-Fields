@@ -2,6 +2,7 @@ package hlaaftana.karmafields.registers
 
 import hlaaftana.discordg.Client
 import hlaaftana.discordg.exceptions.NoPermissionException
+import hlaaftana.discordg.exceptions.MessageInvalidException
 import hlaaftana.discordg.util.JSONUtil
 import hlaaftana.discordg.util.MiscUtil
 import hlaaftana.discordg.util.bot.CommandBot
@@ -14,51 +15,55 @@ class BotListeners {
 	static register(KarmaFields kf){
 		Client client = kf.client
 
-		client.fields.lockedRoleLastWarned = [:]
+		Util.modifyState(lockedRoleLastWarned: [:])
 
-		client.listener("server"){
+		client.listen('server'){
 			MiscUtil.defaultValueOnException {
-				server.role("|><|")?.edit(color: 0x0066c2)
+				server.role('|><|')?.edit(color: 0x0066c2)
 			}
 
-			server.decorate("Looks like I joined. Yay. Do |>help or ><help for commands.")
+			server.formatted('Looks like I joined. Yay. Do |>help or ><help for commands.')
 			File a = new File("guilds/${server.id}.json")
 			a.createNewFile()
-			if (a.text == ""){
+			if (a.text == ''){
 				JSONUtil.dump(a, [:])
 			}
 		}
 
-		client.listener("role_update"){
+		client.listen('role_update'){
 			if (!server.member_role &&
 				!server.bot_role &&
 				!server.guest_role) return
 			whatis(role.id){
-				["member", "guest", "bot"].each { x ->
+				['member', 'guest', 'bot'].each { x ->
 					when(server."${x}_role"){
 						if (role.locked){
-							if (!client.lockedRoleLastWarned[role.id]){
-								server.decorate("This server's $x role " +
-									"(${Util.formatFull(role)}) is now " +
+							if (!Util.state.lockedRoleLastWarned[role.id]){
+								server.formatted("This server's $x role " +
+									"(${role.inspect()}) is now " +
 									"locked for me. Please set a new $x role " +
 									"using |>${x}role or give me a role with " +
-									"a higher position.")
-								client.lockedRoleLastWarned[role.id] = true
+									'a higher position.')
+								Util.modifyState(lockedRoleLastWarned: [(role.id): true])
 							}
-						}else client.lockedRoleLastWarned[role.id] = false
+						}else{
+							Map s = Util.state.clone()
+							s.lockedRoleLastWarned.remove(role.id)
+							JSONUtil.dump('state.json', s)
+						}
 					}
 				}
 			}
 		}
 
-		client.listener("role_delete"){
+		client.listen('role_delete'){
 			if (!server.member_role &&
 				!server.bot_role &&
 				!server.guest_role) return
 			whatis(json.role_id){
-				["member", "guest", "bot"].each { x ->
+				['member', 'guest', 'bot'].each { x ->
 					when(server."${x}_role"){
-						server.decorate("This server's $x role (${Util.formatFull(role)})" +
+						server.formatted("This server's $x role (${role.inspect()})" +
 							" is now deleted. " +
 							"Please set a new $x role using |>${x}role.")
 					}
@@ -68,34 +73,53 @@ class BotListeners {
 
 		kf.bot.listenerSystem.addListener(CommandBot.Events.NO_COMMAND){ d ->
 			kf.markovFileThreadPool.submit {
+				if (d.json.channel_id in JSONUtil.parse(new File(
+					'markovdata.json'))[d.json.author.id]?.blacklist) return
 				File file = new File("markovs/${d.json.author.id}.txt")
 				if (!file.exists()) file.createNewFile()
-				file.append(d.json.content + "\n", "UTF-8")
+				file.append(d.json.content + '\r\n', 'UTF-8')
+			}
+		}
+		
+		kf.bot.listenerSystem.listen(CommandBot.Events.EXCEPTION){
+			if (exception in MessageInvalidException){
+				channel.formatted('Unfortunately my message was too long.')
+			}
+			if (exception in NoPermissionException){
+				try{
+					channel.formatted('It seems I don\'t have permissions. ' +
+						(exception.response.message ?
+							'Discord says ' + exception.response.message :
+							'Discord didn\'t say how.'))
+				}catch (NoPermissionException ex){
+					println 'Don\'t have message permissions in ' +
+						channel ' in ' + server
+				}
 			}
 		}
 
-		client.listener("member"){
-			["guest", "member"].each { n ->
+		client.listen('member'){
+			['guest', 'member'].each { n ->
 				if (server."auto$n" && !(member.bot && server.autobot)){
 					try{
 						member.addRole(server."${n}_role")
 					}catch (NoPermissionException ex){
-						server.decorate("I tried to auto$n ${Util.formatFull(member)} " +
-							"but I seem to not have permissions.")
+						server.formatted("I tried to auto$n ${member.inspect()} " +
+							'but I seem to not have permissions.')
 						return
 					}
-					server.modlog("Auto${n}ed ${Util.formatFull(member)}.")
+					server.modlog("Auto${n}ed ${member.inspect()}.")
 				}
 			}
 			if (server.autobot && member.bot){
 				try{
 					member.addRole(server.bot_role)
 				}catch (NoPermissionException ex){
-					server.decorate("I tried to autobot ${Util.formatFull(member)} " +
-						"but I seem to not have permissions.")
+					server.formatted("I tried to autobot ${member.inspect()} " +
+						'but I seem to not have permissions.')
 					return
 				}
-				server.decorate("> Autobotted ${Util.formatFull(member)}.".block("accesslog"))
+				server.formatted("Autobotted ${member.inspect()}.")
 			}
 		}
 	}

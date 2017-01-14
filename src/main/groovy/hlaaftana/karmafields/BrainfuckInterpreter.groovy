@@ -22,30 +22,25 @@ class BrainfuckInterpreter {
 				when(List){
 					while (stack[stackPosition]){
 						++steps
-						output += interpret(c)
+						output += interpret(c, mode)
 					}
 				}
-				when ">": {
+				when '>': {
 					++stackPosition
 					++steps
-				}
-				when "<": {
+				}, '<': {
 					--stackPosition
 					++steps
-				}
-				when "+": {
+				}, '+': {
 					++stack[stackPosition]
 					++steps
-				}
-				when "-": {
+				}, '-': {
 					--stack[stackPosition]
 					++steps
-				}
-				when ".": {
+				}, '.': {
 					output += stack[stackPosition]
 					++steps
-				}
-				when ",": {
+				}, ',': {
 					stack[stackPosition] = inputMethod(this)
 					++steps
 				}
@@ -54,16 +49,16 @@ class BrainfuckInterpreter {
 		mode.run(output)
 	}
 
-	private static toLists(String bf){
+	private static List toLists(String bf){
 		List a = []
 		int howDeep = 0
 		bf.each {
-			def var = a
+			List var = a
 			howDeep.times { var = var.last() }
-			if (it == "["){
+			if (it == '['){
 				++howDeep
 				var.add([])
-			}else if (it == "]"){
+			}else if (it == ']'){
 				--howDeep
 			}else{
 				var.add it
@@ -73,9 +68,9 @@ class BrainfuckInterpreter {
 	}
 
 	enum Modes {
-		CHAR({ l -> l.collect { (it + 32) as char }.join("") }),
+		CHAR({ l -> l.collect { it + 32 as char }.join() }),
 		NUM({ l -> l }),
-		UNICODE({ l -> l.collect { it as char }.join("") })
+		UNICODE({ l -> l.collect { it as char }.join() })
 
 		Closure closure
 		Closure<String> joiner

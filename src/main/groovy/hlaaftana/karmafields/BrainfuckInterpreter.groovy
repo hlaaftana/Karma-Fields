@@ -22,7 +22,7 @@ class BrainfuckInterpreter {
 				when(List){
 					while (stack[stackPosition]){
 						++steps
-						output += interpret(c, mode)
+						output += interpret(c, Modes.NUM)
 					}
 				}
 				when '>': {

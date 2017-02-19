@@ -1,16 +1,21 @@
 package hlaaftana.karmafields.registers
 
+import java.util.Map;
+
 import hlaaftana.discordg.Client
+import hlaaftana.discordg.objects.Channel
 import hlaaftana.discordg.objects.Message
 import hlaaftana.discordg.objects.Permissions
 import hlaaftana.discordg.util.bot.Command
 import hlaaftana.discordg.util.bot.CommandBot
 import hlaaftana.discordg.util.bot.DSLCommand
+import hlaaftana.discordg.util.MiscUtil
 import hlaaftana.karmafields.Arguments
+import hlaaftana.karmafields.CommandRegister;
 import hlaaftana.karmafields.KarmaFields
 import hlaaftana.karmafields.Util
 
-class MetaCommands {
+class MetaCommands extends CommandRegister {
 	static Map groups = [
 		Meta: [
 			description: 'Commands about the bot itself.'
@@ -26,6 +31,9 @@ class MetaCommands {
 		],
 		'Cookie-cutter': [
 			description: 'Commands you can find in other bots, or commands that lack in use.'
+		],
+		Custom: [
+			description: 'Commands written in Kismet and made by users in a server.'
 		]
 	]
 	
@@ -35,91 +43,49 @@ class MetaCommands {
 			description: 'One of #x, #X, x, X. Designates the color role naming format.',
 			default: 'x'
 		],
-		guest_role: [
-			types: ['str', 'string'],
-			description: 'An ID of the guest role for the server.'
-		],
-		member_role: [
-			types: ['str', 'string'],
-			description: 'An ID of the member role for the server.'
-		],
-		bot_role: [
-			types: ['str', 'string'],
-			description: 'An ID of the bot role for the server.'
-		],
-		autoguest: [
+		delete_unused_color_roles: [
 			types: ['bool', 'boolean'],
-			description: 'Enables/disables autoguesting.'
-		],
-		automember: [
-			types: ['bool', 'boolean'],
-			description: 'Enables/disables automembering.'
-		],
-		autobot: [
-			types: ['bool', 'boolean'],
-			description: 'Enables/disables autobotting.'
-		],
-		member_vote_enabled: [
-			types: ['bool', 'boolean'],
-			description: 'Enables/disables the votemember command.',
+			description: 'Deletes a color role after a user changes their color if no one else uses it.',
 			default: 'true'
-		],
-		member_vote_count: [
-			types: ['num', 'number'],
-			description: 'The sum of votes needed for a user to become member.',
-			default: '5'
-		],
-		member_kick_vote_count: [
-			types: ['num', 'number'],
-			description: 'The sum of votes needed for a user to be kicked.',
-			default: '-5'
 		]
 	]
 
 	static {
 		groups.each { k, v -> groups[k].name = k }
 	}
-
-	static register(KarmaFields kf){
-		CommandBot bot = kf.bot
-		Client client = bot.client
-
-		bot.command('feedback',
-			group: 'Meta',
+	
+	def command(Map x = [:], ...args){ bot.command(x + [group: 'Meta'], *args) }
+	def register(){
+		command('feedback',
+			id: '1',
 			description: 'Sends me (the bot author) feedback on the bot.',
 			usages: [
 				' (text)': 'Sends me the text as feedback.'
 			]){
 			try{
-				client.user(kf.me).formatted("Feedback by ${Util.formatLongUser(author)}:\n$args")
+				client.user(KarmaFields.me).formatted("Feedback by ${Util.formatLongUser(author)}:\n$args")
 				formatted('Feedback sent.')
 			}catch (ex){
 				formatted("Could not send feedback (${ex.class.simpleName}). Sorry for the inconvience.")
 			}
 		}
 
-		bot.command(['info', 'information'],
-			group: 'Meta',
+		command(['info', 'information'],
+			id: '2',
 			description: 'Sends information about the bot\'s backend.',
 			usages: [
 				'': 'Sends the information.'
 			]){
 			formatted("""Programming language: Groovy
-Author: ${Util.formatLongUser(kf.me)}
+Author: ${Util.formatLongUser(KarmaFields.me)}
 Source code: "https://github.com/hlaaftana/Karma-Fields"
 Library: DiscordG ("https://github.com/hlaaftana/DiscordG")
 Memory usage: ${Runtime.runtime.totalMemory() / (1 << 20)}/${Runtime.runtime.maxMemory() / (1 << 20)}MB
 Invite: ${Util.formatUrl(client.appLink(client.appId, 268435456))}""")
 		}
 
-		bot.command(['join', 'invite'],
-			group: 'Meta',
-			description: 'Gives the bot\'s URL to add it to servers. No arguments.'){
-			formatted(Util.formatUrl(client.appLink(client.app_id, 268435456)))
-		}
-
-		bot.command(['help', 'commands'],
-			group: 'Meta',
+		command(['help', 'commands'],
+			id: '4',
 			description: 'Lists command groups or gives information about a command or group.',
 			usages: [
 				'': 'Lists group and gives information about how to call the bot.',
@@ -144,24 +110,24 @@ Invite: ${Util.formatUrl(client.appLink(client.appId, 268435456))}""")
 					formatted('Invalid property name.')
 				}
 			}else if (args){
-				def (group, command) = [this.groups[args.trim().toLowerCase().capitalize()],
-					kf.findCommand(args)]
+				def (group, commands) = [this.groups[args.trim().toLowerCase().capitalize()],
+					KarmaFields.findCommands(args, message)]
 				if (group){
-					def commands = bot.commands.findAll { it.info.group == group.name && !it.info.hide }
-					def aliases = commands.collect {
-						it.aliases.findAll { !it.regex }
+					def cmds = bot.commands.findAll { it.allows(message) &&
+						it.info.group == group.name && !it.info.hide }
+					cmds = cmds.collect {
+						[it.triggers.findAll { !it.regex && it.allows(message) },
+							it.aliases.findAll { !it.regex && it.allows(message) }]
 					}
 					sendMessage("""> $group.name: $group.description
 > Commands:
-${aliases.collect { it.collect { it.toString().surround '"' }.join(" or ") }.join(", ")}""".block("accesslog"))
-				}else if (command){
-					String msg = formatCommand(command, usedTrigger.toString(), args)
+${cmds.collect { "${it[1].join(', ')} [${it[0].join(' ')}]" }.join('\n')}""".block("accesslog"))
+				}else if (commands){
+					String msg = commands.collect {
+						formatCommand(message, it, usedTrigger.toString(), args)
+					}.join('\n')
 					if (msg.size() < 2000) sendMessage(msg)
-					else {
-						sendMessage("""${command.aliases.findAll { !it.regex }.collect { it.toString().surround '"' }.join(" or ")} ($command.group): $command.description
->${'-' * 20}<
-The usage and the examples make this message more than 2000 characters, which is Discord's limit for messages. Unfortunately you have to use ${usedTrigger}usage and ${usedTrigger}examples separately.""".block("accesslog"))
-					}
+					else sendFile("command-help-$command.id-${message.id}.txt", msg.getBytes('UTF-8'))
 				}else{
 					formatted('Command or group not found.')
 				}
@@ -175,58 +141,14 @@ The usage and the examples make this message more than 2000 characters, which is
 ${this.groups.collect { k, v -> "> $k: $v.description" }.join("\n")}""".block("accesslog"))
 			}
 		}
-
-		bot.command('command',
-			group: 'Meta',
-			description: 'Gives information about a command.',
-			usages: [
-				' (command)': 'Shows the description, usage and the examples (if any) of the command.'
-			]){
-			def command = kf.findCommand(args)
-			if (!command){
-				formatted 'Invalid command.'
-				return
-			}
-			String msg = formatCommand(command, usedTrigger.toString(), args)
-			if (msg.size() < 2000) sendMessage(msg)
-			else {
-				sendMessage("""${command.aliases.findAll { !it.regex }.collect { it.toString().surround '"' }.join(" or ")} ($command.group): $command.description
->${'-' * 20}<
-The usage and the examples make this message more than 2000 characters, which is Discord's limit for messages. Unfortunately you have to use ${usedTrigger}usage and ${usedTrigger}examples separately.""".block("accesslog"))
-			}
-		}
-
-		bot.command('usage',
-			group: 'Meta',
-			description: 'Shows how a command is used.',
-			usages: [
-				' (command)': 'Shows the usage of the command.'
-			]){
-			def command = kf.findCommand(args)
-			sendMessage((command.info.deprecated ? "> This command is deprecated. Use $command.preferred instead." : """> Usage:
-${command.usages.collect { k, v -> "\"$usedTrigger$args$k\": $v" }.join("\n")}""").block("accesslog"))
-		}
-
-		bot.command('examples',
-			group: 'Meta',
-			description: 'Shows examples of how a command is used.',
-			usages: [
-				' (command)': 'Shows some examples of the command. There might be none.'
-			]){
-			def command = kf.findCommand(args)
-			sendMessage((command.info.deprecated ? "> This command is deprecated. Use $command.preferred instead." :
-				command.info.examples ? """> Examples:
-${command.examples.collect { "\"$usedTrigger$args$it\"" }.join("\n")}""" :
-				"> This command has no examples.").block("accesslog"))
-		}
 		
 		Map batchAmounts = [:]
 		client.pools.batch = Client.newPool(5, 30_000)
 		client.pools.batch.suspend = { batchAmounts[it] >= 5 }
-		bot.command(['batch',
+		command(['batch',
 			~/batch<(\w+?)>/,
 			~/batch<(\w+?)\s*,\s*(\d+)>/],
-			group: 'Meta',
+			id: '8',
 			description: 'Runs a command multiple times. Maximum of 5.',
 			usages: [
 				'<(name), (number)> (arguments)': 'Calls (name) (number) times with (arguments).',
@@ -249,7 +171,7 @@ ${command.examples.collect { "\"$usedTrigger$args$it\"" }.join("\n")}""" :
 				}
 				batchAmounts[bucket] = time + (batchAmounts[bucket] ?: 0)
 				String commandName = captures[0]
-				Command ass = kf.findCommand(commandName)
+				Command ass = KarmaFields.findCommand(commandName)
 				if (!ass){
 					formatted("No such command '$commandName'. Type \"${usedTrigger}usage batch\" to see how this command can be used.")
 					return
@@ -258,7 +180,7 @@ ${command.examples.collect { "\"$usedTrigger$args$it\"" }.join("\n")}""" :
 					formatted('Unfortunately that command is not deemed safe enough to be called multiple times in a short time.')
 					return
 				}
-				Map newData = kf.fabricateCopy(d, content: args ?
+				Map newData = KarmaFields.fabricateCopy(d, content: args ?
 					"$usedTrigger$commandName $args" : "$usedTrigger$commandName")
 				time.times {
 					Thread.start { ass(newData); batchAmounts[bucket]-- }
@@ -266,26 +188,50 @@ ${command.examples.collect { "\"$usedTrigger$args$it\"" }.join("\n")}""" :
 				}
 			}
 		}
-
-		bot.command(['hidelogs', 'hl'],
-			group: 'Meta',
-			description: 'Empty and functionless command to hide a message from your logs for the markov command.',
+		
+		command('clean',
+			id: '9',
+			description: 'Deletes its own messages.',
 			usages: [
-				' (text)': 'Does nothing.'
-			]){}
+				'': 'Cleans in 50 messages.',
+				' (amount)': 'Cleans in the recent gven amount of messages. Maximum of 500.'
+			]){
+			int num = MiscUtil.defaultValueOnException(50){ args.toInteger() }
+			clear(channel, num, client)
+		}
 	}
 
-	static String formatCommand(DSLCommand command,
-		String preferredTrigger = command.triggers.find { !it.regex },
-		String preferredName = command.aliases.find { !it.regex }){
-		def output = command.info.deprecated ? "> This command is deprecated. Use $preferredTrigger$command.preferred instead." : """> ${command.aliases.findAll { !it.regex }.collect { it.toString().surround '"' }.join(" or ")} ($command.group): $command.description
+	static String formatCommand(Message msg, DSLCommand command,
+		String preferredTrigger = null, String preferredName = null){
+		if (command.info.deprecated)
+			return "> This command is deprecated. Use \"$command.preferred\" instead.".block('accesslog')
+		def triggers = command.triggers.findAll { !it.regex && it.allows(msg) }
+		def aliases = command.aliases.findAll { !it.regex && it.allows(msg) }
+		preferredTrigger = preferredTrigger ?: triggers[0]
+		preferredName = preferredName ?: aliases[0]
+		def output = "> $command.id: ${aliases.join(', ')} [${triggers.join(' ')}] ($command.group)"
+		if (command.info.description) output += ": $command.description"
+		if (command.info.usages){
+			output += """
 >${'-' * 20}<
-> Usage:
-${command.usages.collect { k, v -> "\"$preferredTrigger$preferredName$k\": $v" }.join("\n")}"""
+> Usages:
+${command.usages.collect { k, v -> "$preferredTrigger$preferredName$k / $v" }.join('\n')}"""
+		}
 		if (command.info.examples){
-			output += """\n>${'-' * 20}<\n> Examples:
-${command.examples.collect { "\"$preferredTrigger$preferredName$it\"" }.join("\n")}"""
+			output += """
+>${'-' * 20}<
+> Examples:
+${command.examples.collect { "$preferredTrigger$preferredName$it" }.join("\n")}"""
 		}
 		output.block("accesslog")
+	}
+	
+	static clear(Channel channel, int num, Client cl){
+		channel.permissionsFor(cl)['manageMessages'] ?
+			channel.clear(cl, num) :
+			channel.logs(num).findAll { it.object.author.id == cl.id }.each {
+				it.delete()
+				Thread.sleep 1000
+			}
 	}
 }

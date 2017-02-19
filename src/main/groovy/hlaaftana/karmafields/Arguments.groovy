@@ -67,7 +67,7 @@ class Arguments implements Iterator {
 	def goBack(int i){ index -= i }
 	def goBack(CharSequence str){ raw = str + raw; index -= str.length() }
 	
-	static List splitArgs(String arguments, int max = 0){
+	static List splitArgs(String arguments, int max = 0, boolean keepQuotes = false){
 		List list = ['']
 		String currentQuote
 		boolean escaped
@@ -76,19 +76,25 @@ class Arguments implements Iterator {
 				list[list.size() - 1] += ch
 			}else{
 				if (currentQuote){
-					if (!escaped && ch == currentQuote) currentQuote = null
+					if (!escaped && ch == currentQuote){
+						currentQuote = null
+						if (keepQuotes) list[-1] += ch
+					}
 					else if (!escaped && ch == '\\') escaped = true
 					else {
 						escaped = false
-						list[list.size() - 1] += ch
+						list[-1] += ch
 					}
 				}else{
 					if (!escaped && ch == '\\') escaped = true
-					else if (!escaped && ch in ['"', "'"]) currentQuote = ch
+					else if (!escaped && ch in ['"', "'"]){
+						currentQuote = ch
+						if (keepQuotes) list[-1] += ch
+					}
 					else {
 						escaped = false
 						if (Character.isSpaceChar(ch as char)) list += ''
-						else list[list.size() - 1] += ch
+						else list[-1] += ch
 					}
 				}
 			}

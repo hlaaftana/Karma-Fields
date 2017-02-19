@@ -10,18 +10,21 @@ import hlaaftana.discordg.util.JSONUtil
 import hlaaftana.discordg.util.MiscUtil
 import hlaaftana.discordg.util.bot.CommandBot
 import hlaaftana.karmafields.Arguments
+import hlaaftana.karmafields.CommandRegister;
 import hlaaftana.karmafields.KarmaFields
-import hlaaftana.karmafields.PermissionParser
 import hlaaftana.karmafields.Util
+import hlaaftana.karmafields.kismet.Block
+import hlaaftana.karmafields.kismet.Kismet;
+
 import static hlaaftana.discordg.util.WhatIs.whatis
 import static groovyx.gpars.GParsPool.withPool
 import static java.lang.System.currentTimeMillis as now
 
-class ServerCommands {
+class ServerCommands extends CommandRegister {
 	static jsonConversionTypes = [
 		string: Closure.IDENTITY,
 		number: { it.replace('_', '') as BigInteger },
-		rational: { it.replace('_', '') as BigDecimal },
+		decimal: { it.replace('_', '') as BigDecimal },
 		boolean: Boolean.&parseBoolean,
 		null: { null }
 	]
@@ -36,8 +39,7 @@ class ServerCommands {
 	static roleOptions = [
 		color: { Role r ->
 			!r.hoist && !r.permissionValue && r.colorValue &&
-			(r.name ==~ /#?[A-Fa-f0-9]+/ ||
-				MiscUtil.namedColors[r.name.toLowerCase().replaceAll(/\s+/, '')])
+				r.name ==~ /#?[A-Fa-f0-9]+/
 		},
 		unused: { Role r ->
 			!r.server.members*.object*.roles.flatten().contains(r.id)
@@ -49,25 +51,22 @@ class ServerCommands {
 			!r.permissionValue
 		},
 		color_ignore_perms: { Role r ->
-			!r.hoist && r.colorValue && (r.name ==~ /#?[A-Fa-f0-9]+/ ||
-				MiscUtil.namedColors[r.name.toLowerCase().replaceAll(/\s+/, '')])
+			!r.hoist && r.colorValue && r.name ==~ /#?[A-Fa-f0-9]+/
 		}
 	]
 
 	static {
 		roleOptions.colour = roleOptions.color
 		roleOptions.colour_ignore_perms = roleOptions.color_ignore_perms
-		[str: 'string', num: 'number', rat: 'rational', bool: 'boolean'].each { k, v ->
+		[str: 'string', num: 'number', dec: 'decimal', bool: 'boolean'].each { k, v ->
 			jsonConversionTypes[k] = jsonConversionTypes[v]
 		}
 	}
 	
-	static register(KarmaFields kf){
-		CommandBot bot = kf.bot
-		Client client = kf.client
-
-		bot.command(['permissions', 'perms'],
-			group: 'Server',
+	def command(Map x = [:], ...args){ bot.command(x + [group: 'Server'], *args) }
+	def register(){
+		command(['permissions', 'perms'],
+			id: '20',
 			description: 'Sets permission rules for commands (server-specific). ' +
 				'Administrator permission is needed unless the perms for this command are changed.',
 			usages: [
@@ -77,15 +76,21 @@ class ServerCommands {
 				' set (command) (text or file)': 'Sets the permission rules to the given text.',
 				' append (command) (text or file)': 'Appends the given text to the permission rules.',
 				' delete (command)': 'Deletes permissions for the given command.',
-				' test (text or file)': 'Tests the given rules for the message.'
 			],
-			defaultPerms: 'can administrator',
 			serverOnly: true){
 			def a = new Arguments(args)
 			whatis(a.next()){
 				when('for'){
-					def name = kf.findCommand(a.rest).alias.toString()
-					def text = server.perms?.getAt(name)
+					if (!KarmaFields.checkPerms(message, 'view_perms')){
+						formatted('You don\'t have sufficient permissions.')
+						return
+					}
+					def name = KarmaFields.findCommand(a.rest)?.id
+					if (!name){
+						formatted 'Invalid command.'
+						return
+					}
+					def text = guildData.perms?.get(id)?.code
 					if (text)
 						author.sendMessage(text.block('groovy'))
 					else
@@ -98,7 +103,11 @@ class ServerCommands {
 								.collect { "$it: ${it.locals.join(', ')}" }.join('\n'))
 						}
 						when(['cmds', 'commands']){
-							def list = server.perms?.keySet()
+							if (!KarmaFields.checkPerms(message, 'view_perms')){
+								formatted('You don\'t have sufficient permissions.')
+								return
+							}
+							def list = guildData.perms?.keySet()
 							if (list)
 								author.sendMessage(list.join(', ').block('accesslog'))
 							else
@@ -107,518 +116,197 @@ class ServerCommands {
 					}
 				}
 				when('delete'){
-					def command = kf.findCommand(a.next()).alias.toString()
-					new File("guilds/{$serverId}.json").with {
-						write(JSONUtil.parse(text).with { perms?.remove(command) })
+					if (!KarmaFields.checkPerms(message, 'edit_perms')){
+						formatted('You don\'t have sufficient permissions.')
+						return
 					}
+					def command = KarmaFields.findCommand(a.next())?.id
+					if (!command){
+						formatted 'Invalid command.'
+						return
+					}
+					guildData.modify { perms { remove(command) } }
 					formatted('Successfully deleted command permissions.')
 				}
 				when('set'){
-					def command = kf.findCommand(a.next()).alias.toString()
-					def text = json.attachments ?
+					if (!KarmaFields.checkPerms(message, 'edit_perms')){
+						formatted('You don\'t have sufficient permissions.')
+						return
+					}
+					def command = KarmaFields.findCommand(a.next())?.id
+					if (!command){
+						formatted 'Invalid command.'
+						return
+					}
+					def code = json.attachments ?
 						message.attachment.inputStream.text :
 						a.rest.trim()
 					try{
-						PermissionParser.from(text).apply(member, message)
+						Kismet.parse(code)	
 					}catch (ex){
-						formatted("Caught exception: $ex\nPlease fix your permissions.")
+						formatted "Error when parsing:\n$ex"
 						return
 					}
-					Util.modifyServerJson(server, [perms: [(command): text]])
-					formatted('Successfully set command permissions.')
+					guildData.modify(perms: [
+						(command): [
+							message_object: message.object,
+							code: code
+						]
+					])
+					formatted('Successfully set command permissions. However, they are untested.')
 				}
 				when('append'){
-					def command = kf.findCommand(a.next()).alias.toString()
-					def old = server.perms?.getAt(command) ?: ""
-					def text = (old + "\n" + (json.attachments ?
-						message.attachment.inputStream.text :
-						a.rest)).trim()
-					try{
-						PermissionParser.from(text).apply(member, message)
-					}catch (ex){
-						formatted("Caught exception: $ex\nPlease fix your permissions.")
+					if (!KarmaFields.checkPerms(message, 'edit_perms')){
+						formatted('You don\'t have sufficient permissions.')
 						return
 					}
-					Util.modifyServerJson(server, [perms: [(command): text]])
-					formatted('Successfully appended command permissions.')
-				}
-				when('test'){
-					def text = json.attachments ?
+					def command = KarmaFields.findCommand(a.next())?.id
+					if (!command){
+						formatted 'Invalid command.'
+						return
+					}
+					def old = guildData.perms?.getAt(command) ?: ""
+					def code = json.attachments ?
 						message.attachment.inputStream.text :
 						a.rest.trim()
+					code = old + '\n' + code
 					try{
-						formatted(PermissionParser.from(text).apply(member, message))
+						Kismet.parse(code)	
 					}catch (ex){
-						formatted(ex)
+						formatted "Error when parsing:\n$ex"
+						return
 					}
+					guildData.modify(perms: [
+						(command): [
+							message_object: message.object,
+							code: code
+						]
+					])
+					formatted('Successfully appended command permissions.')
 				}
-			}
-		}
-
-		bot.command(['modlog',
-			~/modlog(\-)?/],
-			group: 'Server',
-			description: 'Adds the given channel as a mod log.',
-			usages: [
-				' (#channel or id or name)': 'Adds the channel to the mod log channels.',
-				'- (#channel or id or name)': 'Removes the channel from the mod log channels.'
-			],
-			defaultPerms: 'can manage channels',
-			serverOnly: true){
-			def channel = message.channelMentions ?
-				message.channelMentions[0] :
-				server.channel(args)
-			if (channel){
-				if (captures[0] == '-'){
-					if (server.modlogs) server.modlogs -= channel.id
-				}else{
-					if (server.modlogs) server.modlogs += channel.id
-					else server.modlogs = [channel.id]
-				}
-				formatted("Channel ${channel.inspect()} successfully ${captures[0] == '-' ? "removed as a" : "added as a"} mod log.")
-			}else{
-				if (server.modlogs){
-					server.modlogs = (server.modlogs ?: []).findAll { server.channel(it) }
-					formatted('The current modlog channels are ' +
-						server.modlogs.collect {
-							server.channel(it).inspect() }.join(', ') + '.')
-				}else formatted('Invalid channel.')
-			}
-		}
-
-		["guest", "member", "bot"].each { n ->
-			bot.command(["${n}role",
-				~(n + /role(\-)?/)],
-				group: 'Server',
-				description: "Sets or unsets the \"$n\" role for the server.",
-				usages: [
-					'': "Shows which role the $n role is set to.",
-					' (@rolemention or id or name)': "Sets the $n role to the specified role.",
-					'-': "Removes the $n role."
-				],
-				defaultPerms: "can manage roles",
-				serverOnly: true){
-				if (captures[0] == '-'){
-					server."${n}_role" = null
-					formatted("Current $n role removed.")
-					return
-				}
-				if (!args){
-					def role = server.role(
-						server."${n}_role")
-					if (role)
-						formatted("The $n role is set to " +
-							role.inspect() + '.')
-					else if (server."${n}_role")
-						formatted("The $n role is set to " +
-							server."${n}_role" +
-							' but the role with that ID doesn\'t seem to exist anymore.')
-					else
-						formatted("No $n role has been set.")
-					return
-				}
-				Role role = message.roleMentions ?
-					message.roleMentions[0] :
-					server.role(args)
-				if (!role)
-					formatted('Invalid role.')
-				else if (role?.locked)
-					formatted('Unfortunately that role is locked for me so I can\'t use it.')
-				else if (role?.isLockedFor(member))
-					formatted('Unfortunately the role is locked for you so I can\'t account you on permissions.')
-				else if (role){
-					server."${n}_role" = role.id
-					formatted("Role \"$role\" ($role.id) successfully added as $n role.")
-				}
-			}
-		}
-
-		['guest', 'member', 'bot'].each { n ->
-			bot.command("auto$n",
-				group: 'Server',
-				description: 'Automatically gives new users the set $n role for the server.',
-				usages: [
-					"": "Returns whether auto${n}ing is currently on or off.",
-					" on": "Turns auto${n}ing on.",
-					" off": "Turns auto${n}ing off.",
-					" toggle": "Toggles auto${n}ing."
-				],
-				defaultPerms: 'can manage roles',
-				serverOnly: true){
-				if (!args){
-					formatted("Auto$n is currently " +
-						server."auto$n" ? 'on.' : 'off.')
-				}
-				if (args.toLowerCase() in ['on', 'true', 'yes']){
-					server."auto$n" = true
-					formatted("Auto$n is now on.")
-				}
-				if (args.toLowerCase() in ['off', 'false', 'no']){
-					server."auto$n" = false
-					formatted("Auto$n is now off.")
-				}
-				if (args.toLowerCase() == 'toggle'){
-					server."auto$n" = !server."auto$n"
-					formatted("Auto$n is now " +
-						server."auto$n" ? 'on.' : 'off.')
-				}
-			}
-		}
-
-		bot.command('guest',
-			group: 'Server',
-			description: 'Removes a user\'s member role. If a guest role is set, gives the user a guest role as well.',
-			usages: [
-				'': 'Guests the latest user in the server.',
-				' (@mentions)': 'Guests every user mentioned.'
-			],
-			defaultPerms: '''\
-can manage roles
-set role server.guest_role
-lockedrole role
-not''',
-			serverOnly: true){
-			if (!server.member_role)
-				formatted('This server doesn\'t have a member role set.')
-			else try{
-				def guestRole = server.guest_role
-				def memberRole = server.member_role
-				def botRole = server.bot_role
-				List<Member> members
-				boolean errored
-				if (message.mentions.empty){
-					if (args){
-						Arguments.splitArgs(args).each {
-							def x = server.member(it)
-							if (!x){
-								formatted("Invalid member '$it'.")
-								errored = true
-							}
-						}
-					}else members = [server.lastMember]
-				}else{
-					members = message.mentions.collect { server.member(it) }
-				}
-				if (errored) return
-				String output = "The following members were guested by $member ($member.id):"
-				members.each {
-					it.editRoles(it.object.roles + guestRole - memberRole - botRole - null)
-					output += "\n$it ($it.id)"
-				}
-				formatted(output)
-				server.modlogs.collect { server.channel(it) }*.formatted(output)
-			}catch (NoPermissionException ex){
-				formatted('Failed to guest member(s). I don\'t seem to have permissions.')
-			}
-		}
-
-		bot.command('member',
-			group: 'Server',
-			description: 'Gives the set member role to a user/users. Member role is set using <memberrole>.',
-			usages: [
-				'': 'Members the latest user in the server.',
-				' (@mentions)': 'Members every user mentioned.'
-			],
-			defaultPerms: '''\
-can manage roles
-set role server.member_role
-lockedrole role
-not''',
-			serverOnly: true){
-			if (!server.member_role)
-				formatted('This server doesn\'t have a member role set.')
-			else try{
-				def guestRole = server.guest_role
-				def memberRole = server.member_role
-				def botRole = server.bot_role
-				List<Member> members
-				if (message.mentions.empty){
-					members = [server.lastMember]
-				}else{
-					members = message.mentions.collect { server.member(it) }
-				}
-				String output = "The following members were membered by $member ($member.id):"
-				members.each {
-					it.editRoles(it.object.roles + memberRole - guestRole - botRole)
-					output += "\n$it ($it.id)"
-				}
-				formatted(output)
-				server.modlogs.collect { server.channel(it) }*.formatted(output)
-			}catch (NoPermissionException ex){
-				formatted('Failed to member member(s). I don\'t seem to have permissions.')
-			}
-		}
-
-		bot.command('bot',
-			group: 'Server',
-			description: 'Gives the set bot role to a user/users. Bot role is set using <botrole>.',
-			usages: [
-				'': 'Bots the latest user in the server.',
-				' (@mentions)': 'Bots every user mentioned.'
-			],
-			defaultPerms: '''\
-can manage roles
-set role server.bot_role
-lockedrole role
-not''',
-			serverOnly: true){
-			if (!server.bot_role){
-				formatted('This server doesn\'t have a bot role set.')
-			}else try{
-				def guestRole = server.guest_role
-				def memberRole = server.member_role
-				def botRole = server.bot_role
-				List<Member> members
-				if (message.mentions.empty){
-					members = [server.lastMember]
-				}else{
-					members = message.mentions.collect { server.member(it) }
-				}
-				String output = "The following members were botted by $member ($member.id):"
-				members.each {
-					it.editRoles(it.object.roles + botRole - guestRole - memberRole)
-					output += "\n$it ($it.id)"
-				}
-				formatted(output)
-				server.modlogs.collect { server.channel(it) }*.formatted(output)
-			}catch (NoPermissionException ex){
-				formatted('Failed to bot member(s). I don\'t seem to have permissions.')
 			}
 		}
 		
-		bot.command(['votemember', 'vm',
-			~/(?:votemember|vm)(\-|\\)?/],
-			group: 'Server',
-			description: 'Votes for a user to become a member. ' +
-				'Accounts who joined the server more than 12 hours ago ' +
-				'need to join again for a vote.',
+		command('listener',
+			id: '22',
+			description: 'Runs commands after certain events.',
 			usages: [
-				'': 'Votes for the newest user.',
-				' (@mentions)': 'Votes for the mentioned user(s).',
-				'- ...': 'Votes against the user(s).',
-				'\\ ...': 'Redacts your vote for the user(s).'
+				' add (event) (kismet)': 'Calls the Kismet code when the event is triggered. Returns an ID of the event listener.',
+				' edit (id) (kismet)': 'Edits the listener to the new given code.',
+				' delete (id)': 'Deletes the event listener with the given ID.',
+				' list': 'Lists listeners.',
+				' list (event)': 'Lists listeners for the given event.',
+				' info (name)': 'Gives information about the given listener.',
+				' json (name)': 'Gives a JSON object about the given listener.'
 			],
-			defaultPerms: '',
+			checkPerms: true,
 			serverOnly: true){
-			if (!server.member_role){
-				formatted('This server doesn\'t have a member role set.')
-				return
-			}
-			if (!server.member_vote_enabled){
-				formatted('This command isn\'t enabled for this server.')
-				return
-			}
-			List<Member> members = (message.mentions(true) ?: [server.latestMember]) - null
-			if (captures[0] == '\\'){
-				def x = Util.state
-				members.each {
-					x.member_votes?.get(server.id)?.get(it.id)?.remove(json.author.id)
-				}
-				JSONUtil.dump(new File('state.json'), x)
-				formatted('Done.')
-				return
-			}else{
-				for (m in members){
-					if ((timeReceived - m.joinedAt.time) > 43200000){
-						formatted("Member ${m.inspect()} has been in this server for too long.")
+			Arguments a = new Arguments(args)
+			def option = a.next()
+			whatis(option){
+				when('add'){
+					if (!a.hasNext()){
+						formatted 'Not enough arguments.'
 						return
 					}
-					Util.modifyState(member_votes: [(server.id): [(m.id):
-						[(json.author.id): captures[0] == '-' ? -1 : 1]]])
-				}
-				formatted("Voted for ${members*.inspect().join(', ')}.")
-				def y = Util.state
-				def x = y.member_votes[server.id]
-				def toMember = x.findAll { k, v -> v.values().sum() >=
-					(server.member_vote_count ?: 5) }.keySet()
-				def toKick = x.findAll { k, v -> v.values().sum() <=
-					(server.kick_member_vote_count ?: -5) }.keySet()
-				[toMember, toKick]*.each { y.member_votes[server.id].remove(it) }
-				JSONUtil.dump(new File('state.json'), y)
-				toMember = toMember.collect { server.member(it) }
-				toKick = toKick.collect { server.member(it) }
-				def guestRole = server.guest_role
-				def memberRole = server.member_role
-				def botRole = server.bot_role
-				if (toMember){
-					String output = 'The following members were membered via a vote:'
-					toMember.each {
-						it.editRoles(it.object.roles + memberRole - guestRole - botRole)
-						output += "\n$it ($it.id)"
-					}
-					formatted(output)
-					server.modlogs.collect { server.channel(it) }*.formatted(output)
-				}
-				if (toKick){
-					String output = 'The following members were kicked following a vote for member:'
-					toKick.each {
-						it.kick()
-						output += "\n$it ($it.id)"
-					}
-					formatted(output)
-					server.modlogs.collect { server.channel(it) }*.formatted(output)
-				}
-			}
-		}
-
-		bot.command(['ban',
-			~/ban<(\d+)>/],
-			group: 'Server',
-			description: 'Bans a given user/users.',
-			usages: [
-				'': 'Bans the latest user in the server.',
-				' (@mentions)': 'Bans every user mentioned.',
-				'<(days)>': 'Bans the latest user and clears their messages for the past given number of days.',
-				'<(days)> (@mentions)': 'Bans every user mentioned and clears their messages for the past given number of days.'
-			],
-			examples: [
-				'',
-				' @hlaaf#7436',
-				'<3>',
-				'<3> @hlaaf#7436'
-			],
-			defaultPerms: 'can ban',
-			serverOnly: true){
-			try{
-				int days = captures[0].toInteger() ?: 0
-				List<Member> members
-				if (message.mentions.empty){
-					if ((now() - server.lastMember.createdAt.time) >= 60_000 && !args.contains("regardless")){
-						formatted("The latest member, ${server.latestMember.inspect()}, joined more than 1 minute ago. To ban them regardless of that, type \"${usedTrigger}ban regardless\".")
+					def event = a.next()
+					def code = json.attachments ?
+						message.attachment.inputStream.text :
+						a.rest.trim()
+					try{
+						Kismet.parse(code)	
+					}catch (ex){
+						formatted "Error when parsing:\n$ex"
 						return
 					}
-					members = [server.lastMember]
-				}else{
-					members = message.mentions.collect { server.member(it) }
+					guildData.modify(listeners: [
+						(json.id): [
+							event: event,
+							id: json.id,
+							message_object: message.object,
+							code: code
+						]
+					])
+					formatted "Successfully added listener. Its ID is $json.id."
 				}
-				String output = "The following members were banned by $member ($member.id):"
-				members.each {
-					it.ban(days)
-					output += "\n$it ($it.id)"
-				}
-				formatted(output)
-				server.modlog("> $output".replace('\n', '\n> ').block('accesslog'))
-			}catch (NoPermissionException ex){
-				formatted('Failed to ban member(s). I don\'t seem to have permissions.')
-			}
-		}
-
-
-		bot.command(['softban',
-			~/softban<(\d+)>/],
-			group: 'Server',
-			description: 'Quickly bans and unbans users. Usable to clearing a user\'s messages when also kicking them. Original command is in R. Danny, had to add it to this bot for a private server at first.',
-			usages: [
-				'': 'Softbans the latest user in the server.',
-				' (@mentions)': 'Softbans every user mentioned.',
-				'<(days)>': 'Softbans the latest user and clears their messages for the past given number of days.',
-				'<(days)> (@mentions)': 'Softbans every user mentioned and clears their messages for the past given number of days.'
-			],
-			examples: [
-				'',
-				' @hlaaf#7436',
-				'<3>',
-				'<3> @hlaaf#7436'
-			],
-			hide: true,
-			defaultPerms: 'can ban',
-			serverOnly: true){
-			try{
-				int days = captures[0].toInteger() ?: 7
-				List<Member> members
-				if (message.mentions.empty){
-					if ((now() - server.lastMember.createdAt.time) >= 60_000 && !args.contains("regardless")){
-						formatted("The latest member, ${server.latestMember.inspect()}, joined more than 1 minute ago. To ban them regardless of that, type \"${usedTrigger}ban regardless\".")
+				when('edit'){
+					if (!a.hasNext()){
+						formatted 'Not enough arguments.'
 						return
 					}
-					members = [server.lastMember]
-				}else{
-					members = message.mentions.collect { server.member(it) }
+					def id = a.next()
+					def code = json.attachments ?
+						message.attachment.inputStream.text :
+						a.rest.trim()
+					try{
+						Kismet.parse(code)	
+					}catch (ex){
+						formatted "Error when parsing:\n$ex"
+						return
+					}
+					guildData.modify(listeners: [
+						(id): [
+							message_object: message.object,
+							code: code
+						]
+					])
+					formatted "Successfully edited listener."
 				}
-				String output = "The following members were softbanned by $member ($member.id):"
-				members.each {
-					it.ban(days)
-					it.unban()
-					output += "\n$it ($it.id)"
+				when('delete'){
+					if (!a.hasNext()){
+						formatted 'Not enough arguments.'
+						return
+					}
+					def id = a.next()
+					if (a.hasNext()){
+						formatted 'Too many arguments.'
+						return
+					}
+					guildData.listeners { remove(id) }
+					formatted "Removed listener $id."
 				}
-				formatted(output)
-				server.modlog("> $output".replace('\n', '\n> ').block('accesslog'))
-			}catch (NoPermissionException ex){
-				formatted("Failed to softban member(s). I don't seem to have permissions.")
+				when('list'){
+					def event = a.hasNext() ? a.next() : null
+					def header = event ? "Listeners for event $event:\n" : 'All listeners:\n'
+					def ls = event ? guildData.listeners?.values().findAll { it.event == event } :
+						guildData.listeners?.values()
+					formatted(header + (ls*.id.join(', ') ?: 'None.'))
+				}
+				when('info'){
+					def id = a.next()
+					def listener = guildData.listeners?.get(id)
+					if (!listener){
+						formatted 'Listener not found.'
+						return
+					}
+					formatted """\
+Listener $id:
+Event: $listener.event
+Code: $listener.code"""
+				}
 			}
 		}
 
-		bot.command('purgeroles',
-			group: 'Server',
-			description: 'Purges roles with specific filters. If no filters are given, all filters will be used.\n\n' +
-				'List of filters: ' + roleOptions.keySet().join(', '),
-			usages: [
-				'': 'Uses all filters.',
-				' (filter1) (filter2)...': 'Uses the given filters. Note: space separated.'
-			],
-			examples: [
-				'',
-				' color',
-				' unused no_overwrites'
-			],
-			defaultPerms: 'can manage roles',
-			serverOnly: true){
-			try{
-				def options = []
-				if (args){
-					boolean neg = false
-					for (o in args.tokenize()){
-						if (o == '!') neg = true
-						else{
-							if (roleOptions[o])
-								options.add(neg ? { !roleOptions[o](it) } : roleOptions[o])
-							else {
-								sendMessage("Unknown filter: $o.\nList of filters: " +
-									roleOptions.keySet().join(", "))
-								return
-							}
-							if (neg) neg = false
-						}
-					}
-				}else{
-					options = roleOptions.values()
-				}
-				List<Role> roles = server.roles
-				roles.remove(server.defaultRole)
-				options.each {
-					roles = roles.findAll(it)
-				}
-				Message a = formatted("Deleting ${roles.size()} roles in about ${roles.size() / 2} seconds...")
-				long s = now()
-				if (roles){
-					withPool {
-						roles.dropRight(1).each {
-							it.&delete.callAsync()
-							Thread.sleep 500
-						}
-						roles.last().&delete.callAsync()
-					}
-				}
-				a.edit("> Deleted all ${roles.size()} roles in ${(now() - s) / 1000} seconds.".block("accesslog"))
-			}catch (NoPermissionException ex){
-				formatted('I don\'t have permissions to manage roles.')
-			}
-		}
-
-		bot.command(['filterroles', 'purgedroles'],
-			group: 'Server',
+		command(['filterroles', 'roles',
+			~/(?:filter)?roles([\-!]+)/],
+			id: '23',
 			description: 'Finds roles with specific filters. If no filters are given, all filters will be used.\n\n' +
 				'List of filters: ' + roleOptions.keySet().join(', '),
 			usages: [
 				'': 'Uses all filters.',
-				' (filter1) (filter2)...': 'Uses the given filters. Note: space separated.'
+				' (filter1) (filter2)...': 'Uses the given filters. Note: space separated.',
+				'- ...': 'Removes the filtered roles.',
 			],
 			examples: [
 				'',
 				' color',
-				' unused no_overwrites'
+				' unused no_overwrites',
+				' unused ! color'
 			],
 			serverOnly: true){
+			def params = captures[0]?.toList() ?: []
+			List<Role> roles = server.roles
+			roles.remove(server.defaultRole)
 			def options = []
 			if (args){
 				boolean neg = false
@@ -638,17 +326,34 @@ not''',
 			}else{
 				options = roleOptions.values()
 			}
-			List<Role> roles = server.roles
-			roles.remove(server.defaultRole)
 			options.each {
 				roles = roles.findAll(it)
 			}
-			formatted("${roles.join(", ")}\n${roles.size()} total")
+			if (params.contains('-')){
+				if (!KarmaFields.checkPerms(message, 'purgeroles')){
+					formatted('You don\'t have sufficient permissions.')
+					return
+				}
+				Message a = formatted("Deleting ${roles.size()} roles in about ${roles.size() / 2} seconds...")
+				long s = now()
+				if (roles){
+					withPool {
+						roles.dropRight(1).each {
+							it.&delete.callAsync()
+							Thread.sleep 500
+						}
+						roles.last().&delete.callAsync()
+					}
+				}
+				a.edit("> Deleted all ${roles.size()} roles in ${(now() - s) / 1000} seconds.".block("accesslog"))
+			}else{
+				formatted("${roles.join(", ")}\n${roles.size()} total")
+			}
 		}
 		
-		bot.command(['color', 'colour',
+		command(['color', 'colour',
 			~/colou?r<(#?x|X)>/],
-			group: 'Server',
+			id: '24',
 			description: 'Creates/reuses a role that has a color and no other special aspect to it.',
 			usages: [
 				'<[#]x|X> ...': 'Gives the color role with a specific type of name. ' +
@@ -657,7 +362,7 @@ not''',
 				' (hexadecimal number)': 'Uses a hexadecimal number as the color',
 				' (rgb number tuple)': 'Uses numbers separated by commas as RGB numbers for the color.',
 				' (named color)': 'Uses a human readable color (spaces ignored) as the color. (list: \'http://www.december.com/html/spec/colorsvg.html\')',
-				' random': 'Uses a random color between 0x000000 and 0xFFFFFF. That\'s the infamous 16.7 million colors.'
+				' random': 'Uses a random color between 0x000000 and 0xFFFFFF.'
 			],
 			examples: [
 				' fb4bf4',
@@ -665,7 +370,7 @@ not''',
 				' red',
 				' navy blue'
 			],
-			defaultPerms: 'can send messages',
+			checkPerms: true,
 			serverOnly: true){ d ->
 			def r = Util.resolveColor(d)
 			if (r instanceof String){
@@ -678,14 +383,14 @@ not''',
 				return
 			}
 			try{
-				def nt = colorNameTypes[captures[0] ?: server.color_name_type ?: 'x'] ?:
+				def nt = colorNameTypes[captures[0] ?: guildData.color_name_type ?: 'x'] ?:
 					colorNameTypes['x']
 				def a = server.defaultRole.permissionValue
 				Map groupedRoles = member.roles.groupBy {
 					it.hoist || !(it.name ==~ /#?[0-9a-fA-F]+/) ||
 					it.name.contains(" ") ||
 					it.permissionValue > a ||
-					it.permissionValue != 0 ? 1 : 0 }
+					it.permissionValue != 0 || it.locked ? 1 : 0 }
 				// 0 is color roles, 1 is the others
 				boolean created
 				Role role
@@ -693,7 +398,7 @@ not''',
 					role = server.roles.find {
 						!it.hoist && it.permissionValue <= a &&
 							it.name ==~ /#?[0-9a-fA-F]+/ &&
-							it.colorValue == color
+							it.colorValue == color && !it.locked
 					} ?: { ->
 						created = true
 						server.createRole(name:
@@ -707,39 +412,17 @@ not''',
 					'That color is the default color, so I just removed your other colors.'
 				if (groupedRoles[0])
 					m += "\nRemoved roles: ${groupedRoles[0]*.name.join(", ")}"
+				if (guildData.cache.containsKey('delete_unused_color_roles') ?
+					guildData.delete_unused_server_roles : true)
+					groupedRoles[0].findAll { !(it.members - author) }*.delete()
 				formatted(m)
 			}catch (NoPermissionException ex){
 				formatted('I don\'t have sufficient permissions. I need Manage Roles.')
 			}
 		}
 		
-		bot.command(['colornametype', 'colournametype'],
-			group: 'Server',
-			description: 'Sets the default color role naming type for this server.',
-			usages: [
-				'': 'Sends the current naming type.',
-				' (type)': 'Sets the naming type to the given one. Can be one of ' +
-					colorNameTypes.keySet().join(', ')
-			],
-			defaultPerms: 'can manage roles',
-			serverOnly: true){
-			if (args){
-				if (!colorNameTypes.containsKey(args))
-					formatted('The given name type does not exist. Full list: ' +
-						colorNameTypes.keySet().join(', '))
-				else{
-					Util.modifyServerJson(server, [color_name_type: args])
-					formatted('Color name type set.')
-				}
-			}else{
-				def x = server.color_name_type
-				if (x) formatted("The current color name type for this server is '$x'.")
-				else formatted('There is no color name type set for this server.')
-			}
-		}
-		
-		bot.command('modify',
-			group: 'Server',
+		command('modify',
+			id: '25',
 			description: 'Modifies server specific data. This command should require strict permissions.',
 			usages: [
 				'': 'Will send the current JSON file for the server.',
@@ -748,10 +431,14 @@ not''',
 					'value considering the given type. The type can be one of ' +
 					jsonConversionTypes.keySet().join(', ')
 			],
-			defaultPerms: "can administrator",
+			checkPerms: true,
 			serverOnly: true){
-			if (!args){
+			if (!args && KarmaFields.checkPerms(message, 'view_server_data', true)){
 				author.sendFile(new File("guilds/${serverId}.json"))
+				return
+			}
+			if (!KarmaFields.checkPerms(message, 'edit_server_data', true)){
+				formatted('You don\'t have sufficient permissions.')
 				return
 			}
 			Arguments a = new Arguments(args)
@@ -770,7 +457,7 @@ not''',
 						return
 					}
 					def old = new File("guilds/${serverId}.json").bytes
-					Util.modifyServerJson(serverId, json)
+					guildData.modify(json)
 					author.sendFile(old, "${serverId}.json",
 						content: 'Successfully added JSON data. Here\'s the old JSON file:')
 				}
@@ -792,6 +479,163 @@ not''',
 						content: 'Successfully modified property. Here\'s the old JSON file:')
 				}
 			}
+		}
+		
+		command(['customcommand', 'cc', ~/(?:cc|customcommand)([\-~]+)/],
+			id: '32',
+			description: 'Creates a custom command written in Kismet for a server. ' +
+				'They have IDs.',
+			usages: [
+				' create': 'Creates a custom command and gives you the ID. This ID is vital.',
+				'- ...': 'Removes something instead of adding it.',
+				'~ ...': 'Makes a thing regex.',
+				' code (id) (kismet)': 'Sets the code to the given Kismet code.',
+				' alias (id) (name)': 'Adds an alias to the command.',
+				' trigger (id) (trigger)': 'Adds a trigger to the command.',
+				' description (id) (text)': 'Adds a description to the command.',
+				' deprecate (id) (preferred)': 'Deprecates the command.',
+				' checkperms (id) [true|false]': 'Enables checking permissions.',
+				' usage (id) (use case in quotes) (descrption)': 'Adds a usage.',
+				' example (id) (example)': 'Adds an example.',
+				' delete (id)': 'Deletes the given command.'
+			],
+			checkPerms: true,
+			serverOnly: true){
+			def get = { id ->
+				gulidData.commands?.get(id)
+			}.memoize()
+			def rem = { id, name, name2 = null ->
+				guildData.modify {
+					commands {
+						"$id" {
+							if (name2) "$name" { remove(name2) }
+							else remove(name)
+						}
+					}
+				}
+			}
+			def ad = { id, name, value ->
+				guildData.modify(commands: [(id): [(name): value]])
+			}
+			def remove = captures.contains('-')
+			def regex = captures.contains('~')
+			Arguments a = new Arguments(args)
+			def choice = a.next()
+			whatis(choice){
+				when('create'){
+					guildData.modify(commands: [
+						(message.id): [
+							triggers: bot.triggers.collect { it.regex ?
+								[it.toString()] : it.toString() }
+						]
+					])
+					formatted "Successfully created command at $message.id."
+				}
+				when('code'){
+					def id = a.next()
+					def text = json.attachments ?
+						message.attachment.inputStream.text :
+						a.rest
+					if (remove){
+						rem(id, 'code')
+						rem(id, 'message_object')
+					}else if (text){
+						ad(id, 'code', text)
+						ad(id, 'message_object', message.object)
+					}else{
+						try{
+							formatted get(id)?.code
+						}catch (ex){
+							sendFile("cc-$message.id-code-${id}.txt",
+								get(id)?.code?.getBytes('UTF-8'))
+						}
+					}
+					formatted 'Done.'
+				}
+				when('alias'){
+					def id = a.next()
+					if (remove) rem(id, 'aliases', regex ? [a.rest] : a.rest)
+					else if (a.rest) ad(id, 'aliases', regex ? [[a.rest]] : [a.rest])
+					else {
+						formatted get(id)?.aliases?.collect { it instanceof String ?
+							"\"$it\"" : "/$it/" }?.join(', ')
+						return
+					}
+					formatted 'Done.'
+				}
+				when('trigger'){
+					def id = a.next()
+					if (remove) rem(id, 'triggers', regex ? [a.rest] : a.rest)
+					else if (a.rest) ad(id, 'triggers', regex ? [[a.rest]] : [a.rest])
+					else {
+						formatted get(id)?.triggers?.collect { it instanceof String ?
+							"\"$it\"" : "/$it/" }?.join(', ')
+						return
+					}
+					formatted 'Done.'
+				}
+				when('usage'){
+					def id = a.next()
+					def x = a.next()
+					if (remove) rem(id, 'usages', x)
+					else if (a.rest) ad(id, 'usages', [(x): a.rest])
+					else {
+						formatted get(id)?.usages?.collect { k, v -> "\"$k\": $v" }?.join('\n')
+						return
+					}
+					formatted 'Done.'
+				}
+				when('example'){
+					def id = a.next()
+					if (remove) rem(id, 'examples', a.rest)
+					else if (a.rest) ad(id, 'examples', [a.rest])
+					else {
+						formatted get(id)?.examples?.join('\n')
+						return
+					}
+					formatted 'Done.'
+				}
+				when('description'){
+					def id = a.next()
+					if (remove) rem(id, 'description')
+					else if (a.rest) ad(id, 'description', a.rest)
+					else {
+						formatted get(id)?.description
+						return
+					}
+					formatted 'Done.'
+				}
+				when('deprecate'){
+					def id = a.next()
+					if (remove) rem(id, 'deprecated')
+					else if (a.rest) ad(id, 'deprecated', a.rest)
+					else {
+						formatted get(id)?.deprecated
+						return
+					}
+					formatted 'Done.'
+				}
+				when('checkperms'){
+					def id = a.next()
+					if (remove) rem(id, 'checkPerms')
+					else if (a.rest && a.rest in ['true', 'false']) ad(id, 'checkPerms', a.rest.toBoolean())
+					else {
+						formatted get(id)?.checkPerms
+						return
+					}
+					formatted 'Done.'
+				}
+				when('delete'){
+					def id = a.next()
+					guildData.modify {
+						commands {
+							remove id
+						}
+					}
+					formatted 'Done.'
+				}
+			}
+			KarmaFields.registers.find { it instanceof CustomCommands }.update()
 		}
 	}
 }

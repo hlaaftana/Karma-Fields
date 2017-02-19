@@ -7,27 +7,25 @@ import hlaaftana.discordg.util.JSONSimpleHTTP
 import hlaaftana.discordg.util.JSONUtil
 import hlaaftana.discordg.util.MiscUtil
 import hlaaftana.discordg.util.bot.CommandBot
+import hlaaftana.karmafields.CommandRegister;
 import hlaaftana.karmafields.KarmaFields
 import hlaaftana.karmafields.Util
 
-class CookieCutterCommands {
-	
-	static register(KarmaFields kf){
-		CommandBot bot = kf.bot
-		Client client = kf.client
-
-		bot.command('cleverbot',
-			group: 'Cookie-cutter',
+class CookieCutterCommands extends CommandRegister {
+	def command(Map x = [:], ...args){ bot.command(x + [group: 'Cookie-cutter'], *args) }
+	def register(){
+		command('cleverbot',
+			id: '11',
 			description: 'Talks to Cleverbot (cleverbot.io).',
 			usages: [
 				' (text)': 'Talks to Cleverbot.'
 			]){
-			formatted(kf.cleverbot.ask(args))
+			formatted(KarmaFields.cleverbot.ask(args))
 		}
 		
-		bot.command(['word',
+		command(['word',
 			~/word<(\d+)>/],
-			group: 'Cookie-cutter',
+			id: '12',
 			description: 'Looks up a word in the Longman Contemporary English Dictionary.',
 			usages: [
 				' (word)': 'Looks up the given word.',
@@ -52,8 +50,8 @@ class CookieCutterCommands {
 			formatted("$word$pos$ipas:\r$definition\r$example")
 		}
 
-		bot.command('urlencode',
-			group: 'Cookie-cutter',
+		command('urlencode',
+			id: '13',
 			description: 'Appropriates a string for URL parameters.',
 			usages: [
 				' (text)': 'Converts the text.',
@@ -66,8 +64,8 @@ class CookieCutterCommands {
 			else formatted(text.surround('"'))
 		}
 
-		bot.command('urldecode',
-			group: 'Cookie-cutter',
+		command('urldecode',
+			id: '14',
 			description: 'Reverts a string from URL parameters to a normal one.',
 			usages: [
 				' (text)': 'Converts the text.',
@@ -80,8 +78,8 @@ class CookieCutterCommands {
 			else formatted(text.surround('"'))
 		}
 
-		bot.command(['encodejson', 'jsonize', 'jsonify'],
-			group: 'Cookie-cutter',
+		command(['encodejson', 'jsonize', 'jsonify'],
+			id: '15',
 			description: 'Converts a string to JSON, filling in \\u, \\r, \\n, \\t and whatnot.',
 			usages: [
 				' (text)': 'Converts the text.',
@@ -94,8 +92,8 @@ class CookieCutterCommands {
 			else formatted(text)
 		}
 
-		bot.command(['prettyjson', 'ppjson'],
-			group: 'Cookie-cutter',
+		command(['prettyjson', 'ppjson'],
+			id: '16',
 			description: 'Pretty prints JSON text.',
 			usages: [
 				' (text)': 'Converts the text.',
@@ -108,9 +106,9 @@ class CookieCutterCommands {
 			else sendMessage(text.block('json'))
 		}
 
-		bot.command(['convertcase',
+		command(['convertcase',
 			~/convertcase<(\w+)(?:\s*,\s*|\s+)(\w+)>/],
-			group: 'Cookie-cutter',
+			id: '17',
 			description: 'Converts text to a given case type. Case types are: ' +
 				CasingType.defaultCases.keySet().join(', '),
 			usages: [
@@ -130,15 +128,15 @@ class CookieCutterCommands {
 			else formatted(text)
 		}
 
-		bot.command('say',
-			group: 'Cookie-cutter',
+		command('say',
+			id: '18',
 			description: 'Repeats text.',
 			usages: [
 				' (text)': 'Guess.'
 			]){ formatted(args) }
 
-		bot.command('ping',
-			group: 'Cookie-cutter',
+		command('ping',
+			id: '19',
 			description: 'Testing response times.',
 			usages: [
 				'': 'Starts the response time difference sequence.'

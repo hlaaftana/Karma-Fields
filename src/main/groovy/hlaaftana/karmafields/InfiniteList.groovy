@@ -6,7 +6,7 @@ class InfiniteList extends AbstractList {
 	Map changedValues = [:]
 	InfiniteList(defaultValue, int maxSize = Integer.MAX_VALUE){
 		this.defaultValue = defaultValue
-		this.maxSize = [maxSize, 0].max()
+		this.maxSize = Math.max(maxSize, 0)
 	}
 
 	def get(int index){
@@ -63,9 +63,10 @@ class InfiniteList extends AbstractList {
 	}
 
 	List subList(int fromIndex, int toIndex) {
-		def a = new InfiniteList(toIndex - fromIndex)
-		changedValues.collectEntries { k, v -> [(k - fromIndex): v] }
-			.findAll { k, v -> k >= 0 && k < toIndex }.each(a.&set)
+		def a = new InfiniteList(defaultValue, toIndex - fromIndex)
+		changedValues.each { k, v -> if (fromIndex <= k && k < toIndex)
+			a[k - fromIndex] = v
+		}
 		a
 	}
 }

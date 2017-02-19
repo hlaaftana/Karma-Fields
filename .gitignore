@@ -8,6 +8,7 @@
 /states/
 /temp/
 *.json
+*.iml
 /.classpath
 /.project
 /build.gradle

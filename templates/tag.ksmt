@@ -1,0 +1,53 @@
+define x (split_args args 2)
+define choice x[0]
+define tags (get (server_data message.server) "tags")
+if (not tags) (change tags (map ()))
+ifelseif (eq choice "create") (
+  change x (split_args args 3)
+  define name x[1]
+  define content x[2]
+  define existing (get tags name)
+  ifelse existing (send_message message.channel "Tag already exists.") (
+    modify_server_data message.server (map "tags" (map name (map "author" message.author.id "uses" 0 "content" content)))
+    send_message message.channel "Tag successfully created."
+  )
+) (eq choice "edit") (
+  change x (split_args args 3)
+  define name x[1]
+  define content x[2]
+  define existing (get tags name)
+  ifelseif (not existing) (
+	send_message message.channel "Tag doesn't exist."
+  ) (not (eq message.author.id existing.author)) (
+    send_message message.channel "You did not create this tag."
+  ) (
+    modify_server_data message.server (map "tags" (map name (map "content" content)))
+    send_message message.channel "Tag successfully edited."
+  )
+) (eq choice "delete") (
+  define name x[1]
+  define existing (get tags name)
+  ifelseif (not existing) (
+    send_message message.channel "Tag doesn't exist."
+  ) (not (eq existing.author message.author.id)) (
+    send_message message.channel "You don't own this tag."
+  ) (
+	modify_server_data message.server (map "tags" (map name null))
+	send_message message.channel "Tag successfully deleted."
+  )
+) (eq choice "info") (
+  define name x[1]
+  define existing (get tags name)
+  ifelse (not existing) (send_message message.channel "Tag doesn't exist.") (
+	send_message message.channel (format  "Name: %s\nOwner: %s\nUses: %s" name (apply_path unique (member message.server existing.author)) existing.uses)
+  )
+) (
+  define name x[0]
+  define existing (get tags name)
+  ifelse existing (
+    modify_server_data message.server (map "tags" (map name (map "uses" (plus existing.uses 1))))
+    send_message message.channel existing.content
+  ) (
+    send_message message.channel "Tag doesn't exist."
+  )
+)

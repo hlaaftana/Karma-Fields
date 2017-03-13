@@ -16,6 +16,8 @@ import hlaaftana.karmafields.KarmaFields
 import hlaaftana.karmafields.Util
 
 class MetaCommands extends CommandRegister {
+	{ group = 'Meta' }
+
 	static Map groups = [
 		Meta: [
 			description: 'Commands about the bot itself.'
@@ -53,8 +55,7 @@ class MetaCommands extends CommandRegister {
 	static {
 		groups.each { k, v -> groups[k].name = k }
 	}
-	
-	def command(Map x = [:], ...args){ bot.command(x + [group: 'Meta'], *args) }
+
 	def register(){
 		command('feedback',
 			id: '1',

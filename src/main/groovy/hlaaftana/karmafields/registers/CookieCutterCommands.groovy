@@ -12,7 +12,8 @@ import hlaaftana.karmafields.KarmaFields
 import hlaaftana.karmafields.Util
 
 class CookieCutterCommands extends CommandRegister {
-	def command(Map x = [:], ...args){ bot.command(x + [group: 'Cookie-cutter'], *args) }
+	{ group = 'Cookie-cutter' }
+
 	def register(){
 		command('cleverbot',
 			id: '11',
@@ -57,7 +58,7 @@ class CookieCutterCommands extends CommandRegister {
 				' (text)': 'Converts the text.',
 				' (file)': 'Converts the text in the file and uploads a file.'
 			]){
-			def text = json.attachments ? message.attachment.inputStream.text : args
+			def text = json.attachments ? message.attachment.newInputStream().text : args
 			text = URLEncoder.encode(text)
 			boolean file = text.size() > 1000 || json.attachments
 			if (file) sendFile(text.getBytes('UTF-8'), "$usedAlias-${json.id}.txt")
@@ -71,7 +72,7 @@ class CookieCutterCommands extends CommandRegister {
 				' (text)': 'Converts the text.',
 				' (file)': 'Converts the text in the file and uploads a file.'
 			]){
-			def text = json.attachments ? message.attachment.inputStream.text : args
+			def text = json.attachments ? message.attachment.newInputStream().text : args
 			text = URLDecoder.decode(text)
 			boolean file = text.size() > 1000 || json.attachments
 			if (file) sendFile(text.getBytes('UTF-8'), "$usedAlias-${json.id}.txt")
@@ -85,7 +86,7 @@ class CookieCutterCommands extends CommandRegister {
 				' (text)': 'Converts the text.',
 				' (file)': 'Converts the text in the file and uploads a file.'
 			]){
-			def text = json.attachments ? message.attachment.inputStream.text : args
+			def text = json.attachments ? message.attachment.newInputStream().text : args
 			text = JSONUtil.json(text)
 			boolean file = text.size() > 1000 || json.attachments
 			if (file) sendFile(text.getBytes('UTF-8'), "$usedAlias-${json.id}.txt")
@@ -99,7 +100,7 @@ class CookieCutterCommands extends CommandRegister {
 				' (text)': 'Converts the text.',
 				' (file)': 'Converts the text in the file and uploads a file.'
 			]){
-			def text = json.attachments ? message.attachment.inputStream.text : args
+			def text = json.attachments ? message.attachment.newInputStream().text : args
 			text = JsonOutput.prettyPrint(text)
 			boolean file = text.size() > 1000 || json.attachments
 			if (file) sendFile(text.getBytes('UTF-8'), "$usedAlias-${json.id}.txt")
@@ -120,7 +121,7 @@ class CookieCutterCommands extends CommandRegister {
 				MiscUtil.caseConverters.keySet().join(', ')); return }
 			def (from, to) = captures.collect { CasingType.defaultCases[it] }
 			if (!(from && to)){ formatted('Invalid cases.'); return }
-			def text = json.attachments ? message.attachment.inputStream.text : args
+			def text = json.attachments ? message.attachment.newInputStream().text : args
 			text = from.convert(text, to)
 			if (text == null){ formatted('Invalid cases.'); return }
 			boolean file = text.size() > 1000 || json.attachments

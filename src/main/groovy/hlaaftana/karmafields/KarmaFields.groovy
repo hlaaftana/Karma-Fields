@@ -11,6 +11,7 @@ import hlaaftana.karmafields.kismet.Block
 import hlaaftana.karmafields.registers.*
 
 class KarmaFields {
+	static long start = System.currentTimeMillis()
 	static Map defaultPermissions = [
 		view_perms: 'has_permission message.author message.channel "administrator"',
 		edit_perms: 'has_permission message.author message.channel "administrator"',
@@ -32,7 +33,7 @@ class KarmaFields {
 	static CleverbotDotIO cleverbot = new CleverbotDotIO(
 		creds.cb_user, creds.cb_key)
 	static Map<String, DataFile> guildData = [:]
-	static File exceptionLogFile = new File("dumps/exceptions_${System.currentTimeMillis()}.txt")
+	@Lazy static File exceptionLogFile = new File("dumps/exceptions_${System.currentTimeMillis()}.txt")
 
 	static {
 		[client, me].each { Client c -> c.with {
@@ -51,7 +52,8 @@ class KarmaFields {
 			if (!meReady){
 				client.fields.appId = creds.app_id
 				meReady = true
-				println '--- Fully loaded. ---'
+				println '--- Fully loaded in ' + ((System.currentTimeMillis() -
+					start) / 1000) + ' seconds. ---'
 			}
 		}
 
@@ -96,7 +98,7 @@ class KarmaFields {
 		def s = message.server?.guildData().perms?.get(n)
 		def om
 		if (s) om = new Message(message.client, s.message_object)
-		def b = s ? parseDiscordKismet(s, [__original_message: om]) :
+		def b = s ? parseDiscordKismet(s.code, [__original_message: om]) :
 			defaultPermissions[n]
 		if (b){
 			Block x = b.anonymousClone()
@@ -106,7 +108,7 @@ class KarmaFields {
 	}
 	
 	static Block parseDiscordKismet(String code, Map extra = [:]){
-		Kismet.parse(code, (KismetInner.defaultContext + Util.discordKismetFunctions
+		Kismet.parse(code, (KismetInner.defaultContext + Util.discordKismetContext
 			+ extra).collectEntries { k, v -> [(k): Kismet.model(v)] })
 	}
 	

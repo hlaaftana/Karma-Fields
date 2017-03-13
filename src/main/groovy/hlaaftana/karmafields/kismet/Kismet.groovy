@@ -1,27 +1,19 @@
 package hlaaftana.karmafields.kismet
 
-import hlaaftana.discordg.objects.DiscordObject;
-import hlaaftana.karmafields.SandboxedDiscordObject;
-
 class Kismet {
-	static Block parse(String code, Map ctxt = KismetInner.defaultContext){
-		Block block = new Block()
-		def exprs = KismetInner.separateLines(code).collect { it ->
-			KismetInner.parseExpression(block, (String) it) }
-		block.expressions = (LinkedList<Expression>) exprs
-		block.context = new Context(data: ctxt, block: block)
-		block
+	static Block parse(String code, Map ctxt = new HashMap(KismetInner.defaultContext)){
+		def b = new Block(raw: code, context: new Context(data: ctxt))
+		b.context.setBlock(b)
+		def x = KismetInner.compile(code, b)
+		if (!(x instanceof Block)) {
+			b.expressions = [x]
+			b
+		}else x
 	}
 	
-	static eval(String code, Map ctxt = KismetInner.defaultContext){
+	static eval(String code, Map ctxt = new HashMap(KismetInner.defaultContext)){
 		parse(code, ctxt).evaluate()
 	}
-	
-	static SandboxedDiscordObject model(DiscordObject obj){
-		new SandboxedDiscordObject(obj)
-	}
-	
-	static model(obj){
-		obj
-	}
+
+	static KismetObject model(x){ KismetModels.model(x) }
 }

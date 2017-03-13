@@ -22,7 +22,7 @@ class BotListeners extends CommandRegister {
 		join: 'member',
 		leave: 'member_leave'
 	]
-	def exceptionPw
+	@Lazy def exceptionPw = new PrintWriter(KarmaFields.exceptionLogFile)
 	
 	def register(){
 		client.listen('server'){
@@ -38,8 +38,7 @@ class BotListeners extends CommandRegister {
 			}
 			KarmaFields.guildData[server.id] = new DataFile(a)
 		}
-		
-		exceptionPw = new PrintWriter(KarmaFields.exceptionLogFile)
+
 		bot.listenerSystem.listen(CommandBot.Events.EXCEPTION){
 			if (exception in NoPermissionException){
 				try{

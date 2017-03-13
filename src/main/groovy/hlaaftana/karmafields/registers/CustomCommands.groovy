@@ -7,7 +7,7 @@ import hlaaftana.karmafields.CommandRegister
 import hlaaftana.karmafields.kismet.Kismet
 
 class CustomCommands extends CommandRegister {
-	boolean registerAfterReady = true
+	{ group = 'Custom'; registerAfterReady = true }
 	Map abc = [:]
 	
 	def isCommandQualified(object){
@@ -21,8 +21,7 @@ class CustomCommands extends CommandRegister {
 		y.remove('triggers')
 		y.id = id
 		y.server = server
-		y.group = 'Custom'
-		def cmd = bot.command(y, x(object.aliases)){
+		def cmd = command(y, x(object.aliases)){
 			def bl = KarmaFields.parseDiscordKismet(command.info.code,
 				[__original_message: Kismet.model(
 					new Message(client, command.info.message_object)),
@@ -73,7 +72,6 @@ class CustomCommands extends CommandRegister {
 			}
 		}
 		check.each { k, v ->
-			println "oh $k"
 			bot.commands.remove(abc[k])
 			abc.remove(k)
 		}

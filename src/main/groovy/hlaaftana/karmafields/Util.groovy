@@ -17,6 +17,7 @@ import hlaaftana.discordg.objects.Server
 import hlaaftana.discordg.util.ConversionUtil
 import hlaaftana.discordg.util.MiscUtil
 import hlaaftana.karmafields.kismet.Kismet
+import hlaaftana.karmafields.kismet.KismetClass
 import hlaaftana.karmafields.kismet.KismetInner
 import hlaaftana.karmafields.kismet.Expression
 
@@ -28,22 +29,10 @@ import javax.imageio.ImageIO
 @CompileStatic
 class Util {
 	static String CHANNEL_ARG_REGEX = /<?#?([\d\w\-]+?)>?/
-	static Map discordKismetFunctions
+	static Map discordKismetContext
 	
 	@CompileDynamic
 	private static __$dynamicLoad(){
-		Graphics2D.metaClass.drawStraightPolygon = { double length, int sides, double x, double y ->
-			def g = delegate
-			double angle = (180 * (sides - 2)) / sides
-			def last = [x + length * Math.sin(angle), y]
-			sides.times { int i ->
-				def add = [length * Math.cos(2 * i * Math.PI / sides),
-					length * Math.sin(2 * i * Math.PI / sides)]
-				def rounded = [(int) Math.round(last[0] + add[0]), (int) Math.round(last[1] + add[1])]
-				g.drawLine((int) last[0], (int) last[1], *rounded)
-				last = sides % 2 ? [last[0] + add[0], last[1] + add[1]] : rounded
-			}
-		}
 		DiscordObject.metaClass.formatted = { a ->
 			client.sendMessage(delegate, ('> ' + a).replace('\n', '\n> ').block("accesslog"))
 		}
@@ -55,87 +44,94 @@ class Util {
 		}
 		MiscUtil.registerStringMethods()
 		MiscUtil.registerCollectionMethods()
-		discordKismetFunctions = [
-			has_permission: { Message orig, user, x = null, perm ->
-				if (!x){
-					if (user instanceof Member) user.permissions[perm]
+		discordKismetContext = [
+			DiscordObject: new KismetClass().object
+		]
+		discordKismetContext += [
+			has_permission: { Message orig, ...a ->
+				if (a.size() != 3){
+					if (a[0] instanceof Member) user.permissions[a[2]]
 					else throw new WhatAreYouDoingException('No server or channel supplied')
-				}else if (x instanceof Channel)
-					x.permissionsFor(user)[perm]
-				else if (x instanceof Server)
-					x.member(user).permissions[perm]
-				else throw new WhatAreYouDoingException()
+				}else if (a[1] instanceof Channel)
+					a[1].permissionsFor(a[0])[a[2]]
+				else if (a[1] instanceof Server)
+					a[1].member(a[0]).permissions[a[2]]
+				else throw new WhatAreYouDoingException('Permissions in WHAT? ' + a[1].class)
 			},
-			permissions_for: { Message orig, user, channel ->
-				channel.permissionsFor(user)
+			permissions_for: { Message orig, ...a ->
+				a[1].permissionsFor(a[0])
 			},
-			locked: { Message orig, user, role ->
-				role.isLockedFor(user)
+			locked: { Message orig, ...a ->
+				a[1].isLockedFor(a[0])
 			},
-			role: { Message orig, server, role ->
-				server.role(role)
+			role: { Message orig, ...a ->
+				a[0].role(a[1])
 			},
-			channel: { Message orig, server, channel ->
-				server.channel(channel)
+			channel: { Message orig, ...a ->
+				a[0].channel(a[1])
 			},
-			member: { Message orig, server, user ->
-				server.member(user)
+			member: { Message orig, ...a ->
+				a[0].member(a[1])
 			},
-			permission_overwrite: { Message orig, channel, overwrite ->
-				channel.overwrite(overwrite)
+			permission_overwrite: { Message orig, ...a ->
+				a[0].overwrite(a[1])
 			},
-			kick: { Message orig, server = null, user ->
+			kick: { Message orig, ...a ->
 				if (orig && !orig.authorPermissions['kick'])
 					throw new AuthorOfThisScriptDoesntHavePermissionsException()
-				if (user instanceof Member) user.kick()
-				else server.kick(user)
+				if (a[0] instanceof Member) a[0].kick()
+				else a[0].kick(a[1])
 			},
-			ban: { Message orig, server = null, user ->
+			ban: { Message orig, ...a ->
 				if (orig && !orig.authorPermissions['ban'])
 					throw new AuthorOfThisScriptDoesntHavePermissionsException()
-				if (user instanceof Member) user.ban()
-				else server.ban(user)
+				if (a[0] instanceof Member) a[0].ban()
+				else a[0].ban(a[1])
 			},
-			unban: { Message orig, server, user ->
+			unban: { Message orig, ...a ->
 				if (orig && !orig.authorPermissions['ban'])
 					throw new AuthorOfThisScriptDoesntHavePermissionsException()
-				server.unban(user)
+				if (a[0] instanceof Member) a[0].ban()
+				else a[0].unban(a[1])
 			},
-			add_role: { Message orig, server = null, user, role ->
-				def s = user instanceof Member ? user.server : server
-				def r = s.role(role)
+			add_role: { Message orig, ...a ->
+				def s = a[0] instanceof Member ? a[0].server : a[0]
+				def u = a[0] instanceof Member ? a[0] : a[1]
+				def r = s.role(a[0] instanceof Member ? a[1] : a[2])
 				if (orig && !orig.authorPermissions['manageRoles'] || r.isLockedFor(orig.author))
 					throw new AuthorOfThisScriptDoesntHavePermissionsException()
-				s.addRole(user, r)
+				s.addRole(u, r)
 			},
-			remove_role: { Message orig, server = null, user, role ->
-				def s = user instanceof Member ? user.server : server
-				def r = s.role(role)
+			remove_role: { Message orig, ...a ->
+				def s = a[0] instanceof Member ? a[0].server : a[0]
+				def u = a[0] instanceof Member ? a[0] : a[1]
+				def r = s.role(a[0] instanceof Member ? a[1] : a[2])
 				if (orig && !orig.authorPermissions['manageRoles'] || r.isLockedFor(orig.author))
 					throw new AuthorOfThisScriptDoesntHavePermissionsException()
-				s.removeRole(user, r)
+				s.removeRole(u, r)
 			},
-			get_bans: { Message orig, server ->
+			get_bans: { Message orig, ...a ->
 				if (orig && !orig.authorPermissions['ban'])
 					throw new AuthorOfThisScriptDoesntHavePermissionsException()
-				server.requestBans()
+				a[0].requestBans()
 			},
-			get_regions: { Message orig, server ->
+			get_regions: { Message orig, ...a ->
 				if (orig && !orig.authorPermissions['manageServer'])
 					throw new AuthorOfThisScriptDoesntHavePermissionsException()
-				server.requestRegions()
+				a[0].requestRegions()
 			},
-			get_invites: { Message orig, server ->
+			get_invites: { Message orig, ...a ->
 				if (orig && !orig.authorPermissions['manageServer'])
 					throw new AuthorOfThisScriptDoesntHavePermissionsException()
-				server.requestInvites()
+				a[0].requestInvites()
 			},
-			get_integrations: { Message orig, server ->
+			get_integrations: { Message orig, ...a ->
 				if (orig && !orig.authorPermissions['manageServer'])
 					throw new AuthorOfThisScriptDoesntHavePermissionsException()
-				server.requestIntegrations()
+				a[0].requestIntegrations()
 			},
-			edit: { Message orig, obj, data ->
+			edit: { Message orig, ...a ->
+				def (obj, data) = a.toList()
 				if (!orig){ obj.edit(data); return }
 				def ap = orig.authorPermissions
 				Closure hm = { ap[it] }
@@ -198,36 +194,46 @@ class Util {
 					else obj.delete()
 				}else throw new WhatAreYouDoingException("Class ${obj.class} cant be deleted")
 			},
-			send_message: { Message orig, channel, con ->
-				channel.sendMessage(con)
+			send_message: { Message orig, ...a ->
+				a[0].sendMessage(a[1])
 			},
-			server_data: { Message orig, server ->
-				KarmaFields.guildData[DiscordObject.id(server)].kismet_data
+			server_data: { Message orig, ...a ->
+				def x = KarmaFields.guildData[DiscordObject.id(a[0])].kismet_data
+				if (x == null){
+					KarmaFields.guildData[DiscordObject.id(a[0])].modify(kismet_data: [:])
+					x = [:]
+				}
+				x
 			},
-			modify_server_data: { Message orig, server, Map data ->
-				KarmaFields.guildData[DiscordObject.id(server)].modify(kismet_data: data)
+			modify_server_data: { Message orig, ...a ->
+				KarmaFields.guildData[DiscordObject.id(a[0])].modify(kismet_data: a[1])
 			},
-			check_perms: { Message orig, message, perm, defaul = false ->
-				KarmaFields.checkPerms(message, perm, defaul)
+			check_perms: { Message orig, ...a ->
+				def (msg, perm, defaul) = a.toList() + [false]
+				KarmaFields.checkPerms(msg, perm, defaul)
 			},
-			split_args: { Message orig, text, max = 0, keepQuotes = false ->
+			split_args: { Message orig, ...a ->
+				def (text, max, keepQuotes) = a.toList()
+				if (max == null) max = 0
+				if (keepQuotes == null) keepQuotes = false
 				Arguments.splitArgs(text, max, keepQuotes)
 			},
-			emulate_message: { Message orig, message, content ->
+			emulate_message: { Message orig, ...a ->
+				def (message, content) = a
 				def x = message.object.clone()
 				x.content = content
 				KarmaFields.client.dispatchEvent('MESSAGE_CREATE',
 					KarmaFields.fabricateEventFromMessageObject(x))
 			}
 		].collectEntries { k, v ->
-			[(k): KismetInner.macro { Expression... exprs ->
-				def x = exprs*.evaluate().collect { it instanceof SandboxedDiscordObject ? it.inner() : it }
-				def m
+			[(k): Kismet.model(KismetInner.macro { ...exprs ->
+				def x = exprs*.evaluate()*.inner()
+				def m = null
 				try {
 					m = exprs[0].block.context.__original_message?.inner()
 				}catch (ex){}
 				Kismet.model(v(m, *x))
-			}]
+			})]
 		}
 	}
 	

@@ -21,6 +21,8 @@ import static groovyx.gpars.GParsPool.withPool
 import static java.lang.System.currentTimeMillis as now
 
 class ServerCommands extends CommandRegister {
+	{ group = 'Server' }
+
 	static jsonConversionTypes = [
 		string: Closure.IDENTITY,
 		number: { it.replace('_', '') as BigInteger },
@@ -62,8 +64,7 @@ class ServerCommands extends CommandRegister {
 			jsonConversionTypes[k] = jsonConversionTypes[v]
 		}
 	}
-	
-	def command(Map x = [:], ...args){ bot.command(x + [group: 'Server'], *args) }
+
 	def register(){
 		command(['permissions', 'perms'],
 			id: '20',
@@ -139,7 +140,7 @@ class ServerCommands extends CommandRegister {
 						return
 					}
 					def code = json.attachments ?
-						message.attachment.inputStream.text :
+						message.attachment.newInputStream().text :
 						a.rest.trim()
 					try{
 						Kismet.parse(code)	
@@ -167,7 +168,7 @@ class ServerCommands extends CommandRegister {
 					}
 					def old = guildData.perms?.getAt(command) ?: ""
 					def code = json.attachments ?
-						message.attachment.inputStream.text :
+						message.attachment.newInputStream().text :
 						a.rest.trim()
 					code = old + '\n' + code
 					try{
@@ -211,7 +212,7 @@ class ServerCommands extends CommandRegister {
 					}
 					def event = a.next()
 					def code = json.attachments ?
-						message.attachment.inputStream.text :
+						message.attachment.newInputStream().text :
 						a.rest.trim()
 					try{
 						Kismet.parse(code)	
@@ -236,7 +237,7 @@ class ServerCommands extends CommandRegister {
 					}
 					def id = a.next()
 					def code = json.attachments ?
-						message.attachment.inputStream.text :
+						message.attachment.newInputStream().text :
 						a.rest.trim()
 					try{
 						Kismet.parse(code)	
@@ -444,7 +445,7 @@ Code: $listener.code"""
 			Arguments a = new Arguments(args)
 			whatis(a.next()){
 				when('json'){
-					def text = json.attachments ? message.attachment.inputStream.text : a.rest
+					def text = json.attachments ? message.attachment.newInputStream().text : a.rest
 					def json
 					try {
 						json = JSONUtil.parse(text)
@@ -502,17 +503,12 @@ Code: $listener.code"""
 			checkPerms: true,
 			serverOnly: true){
 			def get = { id ->
-				gulidData.commands?.get(id)
-			}.memoize()
+				guildData.commands?.get(id)
+			}
 			def rem = { id, name, name2 = null ->
-				guildData.modify {
-					commands {
-						"$id" {
-							if (name2) "$name" { remove(name2) }
-							else remove(name)
-						}
-					}
-				}
+				if (name2) guildData.commands?.get(id)?.get(name)?.remove(name2)
+				else guildData.commands?.get(id)?.remove(name)
+				guildData.dump()
 			}
 			def ad = { id, name, value ->
 				guildData.modify(commands: [(id): [(name): value]])
@@ -534,7 +530,7 @@ Code: $listener.code"""
 				when('code'){
 					def id = a.next()
 					def text = json.attachments ?
-						message.attachment.inputStream.text :
+						message.attachment.newInputStream().text :
 						a.rest
 					if (remove){
 						rem(id, 'code')
@@ -627,11 +623,8 @@ Code: $listener.code"""
 				}
 				when('delete'){
 					def id = a.next()
-					guildData.modify {
-						commands {
-							remove id
-						}
-					}
+					guildData.commands?.remove id
+					guildData.dump()
 					formatted 'Done.'
 				}
 			}

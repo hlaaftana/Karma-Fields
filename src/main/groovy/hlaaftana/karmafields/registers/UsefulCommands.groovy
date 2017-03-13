@@ -5,22 +5,30 @@ import hlaaftana.discordg.exceptions.NoPermissionException
 import hlaaftana.discordg.objects.Message
 import hlaaftana.discordg.util.JSONUtil
 import hlaaftana.discordg.util.MiscUtil
+import static hlaaftana.discordg.util.WhatIs.whatis
+import hlaaftana.karmafields.Arguments
 import hlaaftana.karmafields.BrainfuckInterpreter
 import hlaaftana.karmafields.CommandRegister
 import hlaaftana.karmafields.KarmaFields
 import hlaaftana.karmafields.kismet.KismetException
 import hlaaftana.karmafields.Util
 import javax.script.ScriptEngine
+import javax.script.ScriptException
 import java.awt.Color
 import javax.script.ScriptEngineManager
 import org.codehaus.groovy.control.CompilerConfiguration
 import org.codehaus.groovy.control.customizers.ImportCustomizer
 
 class UsefulCommands extends CommandRegister {
+	{ group = 'Useful' }
 	static ScriptEngine jsEngine = new ScriptEngineManager().getEngineByName('javascript')
 	static CompilerConfiguration cc
 
 	static {
+		jsEngine.eval('''java = undefined, org = undefined, javax = undefined, com = undefined,
+edu = undefined, javafx = undefined, exit = undefined, quit = undefined, load = undefined,
+loadWithNewGlobal = undefined, DataView = undefined, JSAdapter = undefined, JavaImporter = undefined,
+Packages = undefined, Java = undefined;''')
 		ImportCustomizer imports = new ImportCustomizer()
 		imports.addStarImports(
 			'hlaaftana.discordg',
@@ -49,10 +57,9 @@ class UsefulCommands extends CommandRegister {
 		cc = new CompilerConfiguration()
 		cc.addCompilationCustomizers(imports)
 	}
-	
-	def command(Map x = [:], ...args){ bot.command(x + [group: 'Useful'], *args) }
+
 	def register(){
-		command('eval',
+		command(['eval', ~/eval(!)/],
 			id: '26',
 			description: 'Evaluates Groovy code. Everyone can use this.',
 			usages: [
@@ -73,6 +80,7 @@ class UsefulCommands extends CommandRegister {
 							System.&currentTimeMillis]), this.cc)
 							.evaluate(dea).toString()).block('groovy'))
 				}catch (ex){
+					if (captures.contains('!')) ex.printStackTrace()
 					sendMessage(ex.toString().block('groovy'))
 				}
 			}else{
@@ -106,10 +114,44 @@ class UsefulCommands extends CommandRegister {
 			}
 		}
 
-		command('kismet',
+		command('template',
+			id: '36',
+			description: 'Custom command templates.',
+			usages: [
+		        ' get (name)': 'Gives you the given template.',
+				' list': 'Gives you a list of templates.',
+				' submit (name) (file or text)': 'Submits a new template.'
+			]){
+			Arguments a = new Arguments(args)
+			whatis(a.next()){
+				when('get'){
+					def x = new File("templates/${a.rest}.ksmt")
+					if (x.exists()) {
+						try {
+							sendFile x
+						} catch (ex) {
+							formatted 'File was too big. Yikes. Try the GitHub repository.'
+						}
+					}else formatted 'File doesn\'t exist.'
+				}
+				when('list'){
+					def l = new File('templates').list().findAll { it.endsWith('ksmt') }
+						.collect { it[0..-6] }
+					formatted l.join(', ')
+				}
+				when('submit'){
+					def n = a.next()
+					def t = json.attachments ? message.attachment.newInputStream().text : a.rest
+					new File("templates/submissions/$n-${json.id}.ksmt").write(t)
+					formatted 'Done.'
+				}
+			}
+		}
+
+		command(['kismet', ~/kismet(!)/],
 			id: '27',
 			description: 'Evaluates Kismet code. Kismet is a custom language specifically ' +
-				'for this bot. Docs coming soon.',
+				'for this bot. Docs: https://gist.github.com/hlaaftana/51745113c38ef7dd08b6fe83e2b1cabf.',
 			usages: [
 				' (text)': 'The evals it.'
 			]){
@@ -117,6 +159,7 @@ class UsefulCommands extends CommandRegister {
 				formatted(KarmaFields.parseDiscordKismet(args, [__original_message: message,
 					message: message]).evaluate())
 			}catch (KismetException ex){
+				if (captures.contains('!')) ex.printStackTrace()
 				formatted(ex)
 			}
 		}
@@ -151,6 +194,18 @@ class UsefulCommands extends CommandRegister {
 			}catch (NoPermissionException ex){
 				formatted('I don\'t seem to have permissions to send files. ' +
 					'Maybe you need to try in a testing channel?')
+			}
+		}
+
+		command(['javascript', 'js'],
+			id: '34',
+			description: 'Interprets JavaScript code.',
+			usages: [' (code)': 'Evaluates the code.']){
+			try{
+				sendMessage(('> ' + jsEngine.eval("String(function(){ $args }())"))
+					.block('js'))
+			}catch (ScriptException ex){
+				sendMessage(('> ' + ex).block('js'))
 			}
 		}
 
@@ -203,14 +258,17 @@ class UsefulCommands extends CommandRegister {
 			batchable: true){
 			def text, fn
 			if (json.attachments){
-				text = message.attachment.inputStream.text
+				text = message.attachment.newInputStream().text
 				fn = message.attachment.name
 			}else if (args){
 				try{
 					URL url = new URL(args)
-					text = url.text
+					text = url.getText('User-Agent': 'Mozilla/5.0 (Windows NT 10.0; ' +
+							'WOW64; rv:53.0) Gecko/20100101 Firefox/53.0', Accept: '*/*',
+							Referer: url.toString())
 					fn = url.file
 				}catch (ex){
+					ex.printStackTrace()
 					formatted 'Invalid URL.'
 					return
 				}

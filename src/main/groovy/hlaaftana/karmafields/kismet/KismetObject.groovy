@@ -23,7 +23,7 @@ class KismetObject<T> {
 	}
 
 	def methodMissing(String name, ...args){
-		if (args*.every { it instanceof KismetObject }) args = args*.inner()
+		if (args.every { it instanceof KismetObject }) args = args*.inner()
 		Kismet.model(args ? inner()."$name"(*args) : inner()."$name"())
 	}
 
@@ -36,8 +36,16 @@ class KismetObject<T> {
 		Kismet.model(kclass().inner().caller.call(this, *(args.collect(Kismet.&model))))
 	}
 
-	Iterator iterator(){
-		kclass().inner().iterator.call(this).inner()
+	def "as"(Class c){
+		def k = KismetModels.defaultConversions[c]?.inner()
+		if (k && kclass().inner().converters.containsKey(k)) kclass().inner().converters[k](this)
+		else inner().asType(c)
+	}
+
+	def "as"(KismetClass c){
+		if (c && kclass().inner().converters.containsKey(c)) kclass().inner().converters[c](this)
+		else throw new ClassCastException('Can\'t cast object with class ' +
+			kclass() + ' to class ' + c)
 	}
 
 	boolean asBoolean(){

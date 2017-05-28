@@ -1,15 +1,16 @@
 package hlaaftana.karmafields.registers
 
 import groovy.json.JsonOutput
-import hlaaftana.discordg.Client
 import hlaaftana.discordg.util.CasingType
 import hlaaftana.discordg.util.JSONSimpleHTTP
 import hlaaftana.discordg.util.JSONUtil
 import hlaaftana.discordg.util.MiscUtil
-import hlaaftana.discordg.util.bot.CommandBot
 import hlaaftana.karmafields.CommandRegister;
 import hlaaftana.karmafields.KarmaFields
-import hlaaftana.karmafields.Util
+
+import javax.imageio.ImageIO
+import java.awt.Color
+import java.awt.image.BufferedImage
 
 class CookieCutterCommands extends CommandRegister {
 	{ group = 'Cookie-cutter' }
@@ -23,7 +24,7 @@ class CookieCutterCommands extends CommandRegister {
 			]){
 			formatted(KarmaFields.cleverbot.ask(args))
 		}
-		
+
 		command(['word',
 			~/word<(\d+)>/],
 			id: '12',

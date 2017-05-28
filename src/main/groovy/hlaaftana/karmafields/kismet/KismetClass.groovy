@@ -1,28 +1,24 @@
 package hlaaftana.karmafields.kismet
 
-import groovy.transform.AutoClone
 import groovy.transform.Memoized
 
-@AutoClone
 class KismetClass {
-	private static List<String> names = []
-	private int index = names.size()
+	static List<KismetClass> instances = []
 	Class orig
-	String name = "anonymous_$index"
-	Function has = func { o, k -> o.inner().hasProperty(k) as boolean }
-	Function getter = func { o, k -> o.inner()[k.inner()] }
-	Function setter = func { o, k, v -> o.inner()[k.inner()] = v }
-	Function caller = func { o, ...a -> a ? o.inner()(*a) : o.inner()() }
-	Function constructor = func { ...a -> new KismetObject(new Expando(), this.object) }
-	Function iterator = func { o -> o.inner().iterator() };
+	String name = "anonymous_${instances.size()}"
+	def getter = func { ...a -> a[0].inner()[a[1].inner()] }
+	def setter = func { ...a -> a[0].inner()[a[1].inner()] = a[2] }
+	def caller = func { ...a -> a.size() > 1 ? a[0].inner()(*(a.toList().drop(1))) : a[0].inner()() }
+	def constructor = func { ...a -> }
+	Map<KismetClass, Object> converters = [:];
 
 	{
-		names[index] = name
+		instances += this
 	}
 
 	void setName(String n){
-		if (n in names) throw new IllegalArgumentException("Class with name $n already exists")
-		else { name = n; names[index] = n }
+		if (n in instances*.name) throw new IllegalArgumentException("Class with name $n already exists")
+		this.@name = n
 	}
 
 	@Memoized
@@ -32,18 +28,29 @@ class KismetClass {
 
 	@Memoized
 	static KismetClass getMeta() {
-		new KismetClass() {
-			KismetObject<KismetClass> getObject() {
-				def x = new KismetObject<KismetClass>(this)
-				x.@class_ = x
-				x
-			}
-		}
+		new MetaKismetClass()
 	}
 
-	def call(...args){ constructor(*args) }
+	def call(...args){
+		def a = new KismetObject(new Expando(), this.object)
+		constructor(*(([a] + args.toList()) as KismetObject[]))
+		a
+	}
 
 	String toString(){ "class($name)" }
 
-	private static func(Closure a){ new GroovyFunction(x: a, convert: false) }
+	protected static func(Closure a){ new GroovyFunction(x: a, convert: false) }
+}
+
+class MetaKismetClass extends KismetClass {
+	{
+		name = 'Class'
+		constructor = func { ...a -> a[0].@inner = new KismetClass() }
+	}
+
+	KismetObject<KismetClass> getObject() {
+		def x = new KismetObject<KismetClass>(this)
+		x.@class_ = x
+		x
+	}
 }

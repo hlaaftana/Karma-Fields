@@ -58,7 +58,7 @@ class KarmaFields {
 		}
 
 		client.listen('ready'){
-			client.play('⌀')
+			client.play '⌀'
 			if (!botReady){
 				client.servers.each {
 					def file = new File("guilds/${it.id}.json")

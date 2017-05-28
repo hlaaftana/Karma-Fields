@@ -6,11 +6,12 @@ import hlaaftana.karmafields.Util
 
 class KismetModels {
 	static Map<Class, KismetClass> defaultConversions = [
-		(Macro): 'Macro', (Function): 'Function', (char): 'Character',
-		(byte): 'Int8', (short): 'Int16', (int): 'Int32', (long): 'Int64',
-		(BigInteger): 'Integer', (BigDecimal): 'Decimal', (float): 'Dec32',
-		(double): 'Dec64', (Expression): 'Expression', (String): 'String',
-		(JSONPath): 'Path', (List): 'List', (Map): 'Map', (KismetClass): 'Class'
+		(Macro): 'Macro', (Function): 'Function', (Character): 'Character',
+		(Byte): 'Int8', (Short): 'Int16', (Integer): 'Int32', (Long): 'Int64',
+		(BigInteger): 'Integer', (BigDecimal): 'Decimal', (Float): 'Dec32',
+		(Double): 'Dec64', (Expression): 'Expression', (String): 'String',
+		(JSONPath): 'Path', (List): 'List', (Map): 'Map',
+		(Boolean): 'Boolean', (KismetClass): 'Class'
 	].collectEntries { k, v -> [(k): KismetInner.defaultContext[v]] }
 
 	static KismetObject model(Class c){ defaultConversions[c] ?:
@@ -20,9 +21,13 @@ class KismetModels {
 
 	static KismetObject model(Closure c){ model(new GroovyFunction(x: c)) }
 
+	static KismetObject model(File f){
+		model(new Expando(name: f.name) )
+	}
+
 	static KismetObject model(DiscordObject obj){
 		def x = new KismetObject(obj, Util.discordKismetContext.DiscordObject)
-		x.forbidden().addAll(['client', 'object', 'rawObject', 'patchableObject'])
+		x.forbidden().add('client')
 		x
 	}
 

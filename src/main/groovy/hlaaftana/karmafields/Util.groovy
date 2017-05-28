@@ -45,7 +45,7 @@ class Util {
 		MiscUtil.registerStringMethods()
 		MiscUtil.registerCollectionMethods()
 		discordKismetContext = [
-			DiscordObject: new KismetClass().object
+			DiscordObject: new KismetClass(name: 'DiscordObject').object
 		]
 		discordKismetContext += [
 			has_permission: { Message orig, ...a ->
@@ -198,15 +198,21 @@ class Util {
 				a[0].sendMessage(a[1])
 			},
 			server_data: { Message orig, ...a ->
-				def x = KarmaFields.guildData[DiscordObject.id(a[0])].kismet_data
-				if (x == null){
-					KarmaFields.guildData[DiscordObject.id(a[0])].modify(kismet_data: [:])
-					x = [:]
+				if (KarmaFields.checkPerms(orig, 'view_server_data'))
+					KarmaFields.guildData[DiscordObject.id(a[0])].cache
+				else {
+					def x = KarmaFields.guildData[DiscordObject.id(a[0])].kismet_data
+					if (x == null) {
+						KarmaFields.guildData[DiscordObject.id(a[0])].modify(kismet_data: [:])
+						x = [:]
+					}
+					x
 				}
-				x
 			},
 			modify_server_data: { Message orig, ...a ->
-				KarmaFields.guildData[DiscordObject.id(a[0])].modify(kismet_data: a[1])
+				KarmaFields.guildData[DiscordObject.id(a[0])].modify(
+					KarmaFields.checkPerms(orig, 'edit_server_data') ?
+						a[1] : [kismet_data: a[1]])
 			},
 			check_perms: { Message orig, ...a ->
 				def (msg, perm, defaul) = a.toList() + [false]

@@ -5,7 +5,7 @@ import hlaaftana.discordg.util.JSONPath
 
 class KismetInner {
 	static Map defaultContext = [
-		Class: KismetClass.meta.clone().with { name = 'Class'; it }.object,
+		Class: KismetClass.meta.object,
 		Null: new KismetClass(name: 'Null').object,
 		Integer: new KismetClass(orig: BigInteger, name: 'Integer').object,
 		Decimal: new KismetClass(orig: BigDecimal, name: 'Decimal').object,
@@ -26,8 +26,10 @@ class KismetInner {
 		Macro: new KismetClass(orig: Macro, name: 'Macro').object,
 		Native: new KismetClass(orig: Object, name: 'Native').object,
 		null: null, true: true, false: false,
-		class: new GroovyFunction(convert: false, x: { ...a -> a[0].kclass() }),
-		as: new GroovyFunction(convert: false, x: { ...a -> a[0].asType(a[1].kclass()) }),
+		class: func(false){ ...a -> a[0].kclass() },
+		class_for_name: func { ...a -> KismetClass.instances.groupBy { it.name }[a[0]] },
+		// TODO: add converters
+		as: func(false){ ...a -> a[0].as(a[1].inner()) },
 		eq: func { ...args -> args.inject { a, b -> a == b } },
 		is: func { ...a -> a[0].is(a[1]) },
 		in: func { ...a -> a[0] in a[1] },
@@ -77,16 +79,16 @@ class KismetInner {
 		regex: func { ...a -> ~(a[0]) },
 		set: func { ...a -> a[0][a[1]] = a[2] },
 		get: func { ...a -> a[0][a[1]] },
-		string: func { ...a -> a[0] as String },
-		int: func { ...a -> a[0] as BigInteger },
-		int8: func { ...a -> a[0] as byte },
-		int16: func { ...a -> a[0] as short },
-		int32: func { ...a -> a[0] as int },
-		int64: func { ...a -> a[0] as long },
-		char: func { ...a -> a[0] as char },
-		decimal: func { ...a -> a[0] as BigDecimal },
-		decimal32: func { ...a -> a[0] as float },
-		decimal64: func { ...a -> a[0] as double },
+		string: func(false){ ...a -> a[0].as String },
+		int: func(false){ ...a -> a[0].as BigInteger },
+		int8: func(false){ ...a -> a[0].as byte },
+		int16: func(false){ ...a -> a[0].as short },
+		int32: func(false){ ...a -> a[0].as int },
+		int64: func(false){ ...a -> a[0].as long },
+		char: func(false){ ...a -> a[0].as char },
+		decimal: func(false){ ...a -> a[0].as BigDecimal },
+		decimal32: func(false){ ...a -> a[0].as float },
+		decimal64: func(false){ ...a -> a[0].as double },
 		list: func { ...args -> args.toList() },
 		map: func { ...args -> args.toList().collate(2).collectEntries {
 			it.size() == 2 ? [(it[0]): it[1]] : [:] } },
@@ -129,7 +131,7 @@ class KismetInner {
 			b
 		},
 		let: macro { ...exprs ->
-			def m = exprs[0]()
+			def m = exprs[0]().inner()
 			Block b = new Block(expressions: exprs.toList().drop(1))
 			Block.changeBlock(b.expressions, b)
 			b.context = new Context(block: b, data: m)
@@ -185,7 +187,19 @@ class KismetInner {
 		find: func { ...args -> args[0].find { args[1](Kismet.model(it)) } },
 		find_all: func { ...args -> args[0].findAll { args[1](Kismet.model(it)) } },
 		join: func { ...args -> args[0].join(args[1]) },
-		inject: func { ...args -> args[0].inject { a, b -> args[1](Kismet.model(a), Kismet.model(b)) } }
+		inject: func { ...args -> args[0].inject { a, b -> args[1](Kismet.model(a), Kismet.model(b)) } },
+		collate: func { ...args -> args[0].collate(args[1]) },
+		remove: func { ...args -> args[0].remove(args[1]) },
+		pop: func { ...args -> args[0].pop() },
+		add: func { ...args -> args[0].add(args[1]) },
+		add_all: func { ...args -> args[0].addAll(args[1]) },
+		call: macro { ...args ->
+			def x = args[0]()
+			def a = args.toList().drop(1)
+			if (!(x.inner() instanceof Macro)) a = a*.evaluate()
+			x(*a)
+		},
+		range: func { ...args -> args[0]..args[1] }
 	]
 
 	static {
@@ -282,8 +296,8 @@ class KismetInner {
 		new GroovyMacro(x: c)
 	}
 
-	static func(Closure c){
-		new GroovyFunction(x: c)
+	static func(boolean convert = true, Closure c){
+		new GroovyFunction(convert: convert, x: c)
 	}
 }
 
@@ -467,9 +481,12 @@ class CallExpression extends Expression {
 					inSpace = false
 				}
 			}else if (!currentQuote){
-				if (parantheses == 0 && Character.isWhitespace(raw[index] as char)){
+				if (parantheses == 0 && (
+					Character.isWhitespace(raw[index] as char) ||
+						(raw[index] == '('))){
 					inSpace = true
 					inBetween = true
+					--index
 				}else if (raw[index] == '('){
 					parantheses++
 					args[-1] += raw[index]

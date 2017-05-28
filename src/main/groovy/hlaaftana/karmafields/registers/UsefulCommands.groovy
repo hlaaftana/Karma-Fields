@@ -5,6 +5,10 @@ import hlaaftana.discordg.exceptions.NoPermissionException
 import hlaaftana.discordg.objects.Message
 import hlaaftana.discordg.util.JSONUtil
 import hlaaftana.discordg.util.MiscUtil
+import hlaaftana.karmafields.kismet.Kismet
+
+import javax.script.SimpleBindings
+
 import static hlaaftana.discordg.util.WhatIs.whatis
 import hlaaftana.karmafields.Arguments
 import hlaaftana.karmafields.BrainfuckInterpreter
@@ -120,7 +124,7 @@ Packages = undefined, Java = undefined;''')
 			usages: [
 		        ' get (name)': 'Gives you the given template.',
 				' list': 'Gives you a list of templates.',
-				' submit (name) (file or text)': 'Submits a new template.'
+				' submit {name} (file or text)': 'Submits a new template.'
 			]){
 			Arguments a = new Arguments(args)
 			whatis(a.next()){
@@ -207,6 +211,58 @@ Packages = undefined, Java = undefined;''')
 			}catch (ScriptException ex){
 				sendMessage(('> ' + ex).block('js'))
 			}
+		}
+
+		command(['graph'],
+			id: '37',
+			description: 'Graphs code.',
+			usages: [' {x low bound} {x high bound} {marker step} {width} {height} {per pixel} {language} (code)':
+				'Low bound and high bound will be infinite if not numbers. Language is js, ' +
+					'javascript or kismet.']){
+			def run
+			def a = new Arguments(args)
+			def (low, high, step, width, height, pp, lang, code) = [a.next(),
+                a.next(), a.next(),  a.next(), a.next(), a.next(), a.next(), a.rest]
+			low = low.number ? low.toBigDecimal() : null
+			high = high.number ? high.toBigDecimal() : null
+			step = step.toBigDecimal()
+			pp = pp.toBigDecimal()
+			width = (int) Math.min(2000, Math.max(100, width.toInteger()))
+			height = (int) Math.min(2000, Math.max(100, height.toInteger()))
+			if (lang == 'kismet'){
+				def torun = Kismet.parse(code, [x: null])
+				run = { x -> torun.context.getData().x = Kismet.model(x) }
+			}else if (lang == 'js' || lang == 'javascript'){
+				run = { x -> jsEngine.eval(code, new SimpleBindings(x: x)) }
+			}
+			sendFile(filename: "graph-${json.id}.png", Util.draw(width: width * 2 + 1, height: height * 2 + 1){
+				color = new Color(0xFFFFFF)
+				fillRect(0, 0, width * 2 + 1, height * 2 + 1)
+				color = new Color(0)
+				drawLine(width, 0, width, height * 2)
+				drawLine(0, height, width * 2, height)
+				(width / (step / pp)).times {
+					drawLine((int) (width + ((it + 1) * (step / pp))), height - 2,
+						(int) (width + ((it + 1) * (step / pp))), height + 2)
+					drawLine((int) (width - ((it + 1) * (step / pp))), height - 2,
+						(int) (width - ((it + 1) * (step / pp))), height + 2)
+				}
+				(height / (step / pp)).times {
+					drawLine(width - 2, (int) (height + ((it + 1) * (step / pp))),
+							width + 2, (int) (height + ((it + 1) * (step / pp))))
+					drawLine(width - 2, (int) (height - ((it + 1) * (step / pp))),
+							width + 2, (int) (height - ((it + 1) * (step / pp))))
+				}
+				color = new Color(0xff0000)
+				int y0 = run(0) / pp
+				drawLine(width + 1, (int) (height - y0) + 1, width + 1, (int) (height - y0) + 1)
+				width.times {
+					int y1 = run((it + 1) * pp) / pp
+					int y2 = run((-it - 1) * pp) / pp
+					drawLine((int) (width + it + 1), (int) (height - y1), (int) (width + it + 1), (int) (height - y1))
+					drawLine((int) (width - it - 1), (int) (height - y2), (int) (width - it + 1), (int) (height - y2))
+				}
+			})
 		}
 
 		command(['brainfuck', 'bf',

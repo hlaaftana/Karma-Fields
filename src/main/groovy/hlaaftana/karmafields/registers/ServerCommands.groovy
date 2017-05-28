@@ -74,9 +74,9 @@ class ServerCommands extends CommandRegister {
 				' for (command)': 'Sends you the permission rules for the given command in private.',
 				' list names': 'Lists the permission name aliases.',
 				' list cmds|commands': 'Lists the commands with set rules in the server.',
-				' set (command) (text or file)': 'Sets the permission rules to the given text.',
-				' append (command) (text or file)': 'Appends the given text to the permission rules.',
-				' delete (command)': 'Deletes permissions for the given command.',
+				' set {command} (text or file)': 'Sets the permission rules to the given text.',
+				' append {command} (text or file)': 'Appends the given text to the permission rules.',
+				' delete {command}': 'Deletes permissions for the given command.',
 			],
 			serverOnly: true){
 			def a = new Arguments(args)
@@ -428,7 +428,7 @@ Code: $listener.code"""
 			usages: [
 				'': 'Will send the current JSON file for the server.',
 				' json (json or file)': 'Adds the JSON object to the server data. Must be an object.',
-				' property (name) (type) (value)': 'Sets a property with the given ' +
+				' property {name} {type} (value)': 'Sets a property with the given ' +
 					'value considering the given type. The type can be one of ' +
 					jsonConversionTypes.keySet().join(', ')
 			],
@@ -490,15 +490,15 @@ Code: $listener.code"""
 				' create': 'Creates a custom command and gives you the ID. This ID is vital.',
 				'- ...': 'Removes something instead of adding it.',
 				'~ ...': 'Makes a thing regex.',
-				' code (id) (kismet)': 'Sets the code to the given Kismet code.',
-				' alias (id) (name)': 'Adds an alias to the command.',
-				' trigger (id) (trigger)': 'Adds a trigger to the command.',
-				' description (id) (text)': 'Adds a description to the command.',
-				' deprecate (id) (preferred)': 'Deprecates the command.',
-				' checkperms (id) [true|false]': 'Enables checking permissions.',
-				' usage (id) (use case in quotes) (descrption)': 'Adds a usage.',
-				' example (id) (example)': 'Adds an example.',
-				' delete (id)': 'Deletes the given command.'
+				' code {id} (kismet)': 'Sets the code to the given Kismet code.',
+				' alias {id} (name)': 'Adds an alias to the command.',
+				' trigger {id} (trigger)': 'Adds a trigger to the command.',
+				' description {id} (text)': 'Adds a description to the command.',
+				' deprecate {id} (preferred)': 'Deprecates the command.',
+				' checkperms {id} true|false': 'Enables checking permissions.',
+				' usage {id} {use case} (descrption)': 'Adds a usage.',
+				' example {id} (example)': 'Adds an example.',
+				' delete {id}': 'Deletes the given command.'
 			],
 			checkPerms: true,
 			serverOnly: true){

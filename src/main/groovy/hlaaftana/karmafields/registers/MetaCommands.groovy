@@ -1,13 +1,9 @@
 package hlaaftana.karmafields.registers
 
-import java.util.Map;
-
 import hlaaftana.discordg.Client
 import hlaaftana.discordg.objects.Channel
 import hlaaftana.discordg.objects.Message
-import hlaaftana.discordg.objects.Permissions
 import hlaaftana.discordg.util.bot.Command
-import hlaaftana.discordg.util.bot.CommandBot
 import hlaaftana.discordg.util.bot.DSLCommand
 import hlaaftana.discordg.util.MiscUtil
 import hlaaftana.karmafields.Arguments
@@ -22,9 +18,6 @@ class MetaCommands extends CommandRegister {
 		Meta: [
 			description: 'Commands about the bot itself.'
 		],
-		Entertainment: [
-			description: 'Commands you can use when you\'re bored.'
-		],
 		Useful: [
 			description: 'Commands to help you in certain topics.'
 		],
@@ -38,7 +31,7 @@ class MetaCommands extends CommandRegister {
 			description: 'Commands written in Kismet and made by users in a server.'
 		]
 	]
-	
+
 	static Map serverProperties = [
 		color_name_type: [
 			types: ['str', 'string'],
@@ -91,7 +84,8 @@ Invite: ${Util.formatUrl(client.appLink(client.appId, 268435456))}""")
 			usages: [
 				'': 'Lists group and gives information about how to call the bot.',
 				' (group)': 'Lists all commands of a group.',
-				' (command)': 'Shows the description, usage and the examples (if any) of the command.'
+				' (command)': 'Shows the description, usage and the examples (if any) of the command.',
+				' property {name}': 'Gives info about the given property.'
 			]){
 			if (args.startsWith('property ')){
 				Arguments a = new Arguments(args)
@@ -136,13 +130,16 @@ ${cmds.collect { "${it[1].join(', ')} [${it[0].join(' ')}]" }.join('\n')}""".blo
 				def randomCmd = bot.commands.sample().alias
 				sendMessage("""> My prefixes are |> and ><, meaning when you call a command you have to put one of those before the command name (no space).
 > For example: "$usedTrigger$usedAlias" calls this command, and "$usedTrigger$usedAlias $randomCmd" calls this command with the arguments "$randomCmd".
+> In command usages, {} implies the argument can be put in quotes and has to be if it has spaces,
+> [] implies it's optional, () implies it doesn't use quotes, | implies different choices,
+> ... implies more arguments to follow.
 > Some commands use server properties, use "$usedTrigger$usedAlias property list" to get a list.
 > Commands are sectioned via groups. Unfortunately I can't list every command here, so I'm just gonna list the groups and you can do "$usedTrigger$usedAlias (groupname)" to list its commands.
 >${'-' * 20}<
 ${this.groups.collect { k, v -> "> $k: $v.description" }.join("\n")}""".block("accesslog"))
 			}
 		}
-		
+
 		Map batchAmounts = [:]
 		client.pools.batch = Client.newPool(5, 30_000)
 		client.pools.batch.suspend = { batchAmounts[it] >= 5 }
@@ -189,7 +186,7 @@ ${this.groups.collect { k, v -> "> $k: $v.description" }.join("\n")}""".block("a
 				}
 			}
 		}
-		
+
 		command('clean',
 			id: '9',
 			description: 'Deletes its own messages.',
@@ -226,7 +223,7 @@ ${command.examples.collect { "$preferredTrigger$preferredName$it" }.join("\n")}"
 		}
 		output.block("accesslog")
 	}
-	
+
 	static clear(Channel channel, int num, Client cl){
 		channel.permissionsFor(cl)['manageMessages'] ?
 			channel.clear(cl, num) :

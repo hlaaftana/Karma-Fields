@@ -1,20 +1,20 @@
 package hlaaftana.karmafields.registers
 
 import com.mashape.unirest.http.Unirest
-import hlaaftana.discordg.exceptions.NoPermissionException
-import hlaaftana.discordg.objects.Message
-import hlaaftana.discordg.util.JSONUtil
-import hlaaftana.discordg.util.MiscUtil
+import groovy.transform.CompileDynamic
+import groovy.transform.CompileStatic
 import hlaaftana.karmafields.kismet.Kismet
+import hlaaftana.karmafields.relics.CommandEventData
+import hlaaftana.karmafields.relics.JSONUtil
+import hlaaftana.karmafields.relics.MiscUtil
+import sx.blah.discord.handle.obj.IMessage
+import sx.blah.discord.handle.obj.IUser
+import sx.blah.discord.util.MissingPermissionsException
 
-import javax.script.SimpleBindings
+import java.awt.image.BufferedImage
 
-import static hlaaftana.discordg.util.WhatIs.whatis
-import hlaaftana.karmafields.Arguments
 import hlaaftana.karmafields.BrainfuckInterpreter
 import hlaaftana.karmafields.CommandRegister
-import hlaaftana.karmafields.KarmaFields
-import hlaaftana.karmafields.kismet.KismetException
 import hlaaftana.karmafields.Util
 import javax.script.ScriptEngine
 import javax.script.ScriptException
@@ -23,10 +23,16 @@ import javax.script.ScriptEngineManager
 import org.codehaus.groovy.control.CompilerConfiguration
 import org.codehaus.groovy.control.customizers.ImportCustomizer
 
+@CompileStatic
 class UsefulCommands extends CommandRegister {
 	{ group = 'Useful' }
 	static ScriptEngine jsEngine = new ScriptEngineManager().getEngineByName('javascript')
-	static CompilerConfiguration cc
+	static CompilerConfiguration cc = new CompilerConfiguration()
+
+	@CompileDynamic
+	static BrainfuckInterpreter.Modes death(String name) {
+		BrainfuckInterpreter.Modes."${(name ?: "CHAR").toUpperCase()}"
+	}
 
 	static {
 		jsEngine.eval('''java = undefined, org = undefined, javax = undefined, com = undefined,
@@ -43,8 +49,8 @@ Packages = undefined, Java = undefined;''')
 			'hlaaftana.discordg.net',
 			'hlaaftana.discordg.objects',
 			'hlaaftana.discordg.status',
-			'hlaaftana.discordg.util',
-			'hlaaftana.discordg.util.bot',
+			'hlaaftana.karmafields.relics',
+			'hlaaftana.karmafields.relics',
 			'hlaaftana.discordg.voice',
 			'hlaaftana.karmafields',
 			'hlaaftana.karmafields.kismet',
@@ -58,7 +64,6 @@ Packages = undefined, Java = undefined;''')
 			'java.awt.image.BufferedImage',
 			'javax.imageio.ImageIO',
 			'java.util.List')
-		cc = new CompilerConfiguration()
 		cc.addCompilationCustomizers(imports)
 	}
 
@@ -72,100 +77,65 @@ Packages = undefined, Java = undefined;''')
 			examples: [
 				' (33 & 42).intdiv(6).times { println it }'
 			],
-			batchable: true){ d ->
-			String dea = args
+			batchable: true){ CommandEventData d ->
+			String dea = arguments
 				.replaceAll(/^```\w*\n/, '')
 				.replaceAll(/```$/, '')
-			if (json.author.id == KarmaFields.me.id &&
-				usedTrigger.toString() != '><'){
-				try{
-					sendMessage(('> ' + new GroovyShell(
-						new Binding(d + [data: d, now:
-							System.&currentTimeMillis]), this.cc)
-							.evaluate(dea).toString()).block('groovy'))
-				}catch (ex){
-					if (captures.contains('!')) ex.printStackTrace()
-					sendMessage(ex.toString().block('groovy'))
+			if (author.longID == 98457401363025920 &&
+				trigger.toString() != '><')
+				try {
+					sendMessage MiscUtil.block('> ' + new GroovyShell(
+						new Binding((d.properties as Map) + (d.extra as Map) +
+								[data: d, now: System.&currentTimeMillis]), cc)
+							.evaluate(dea).toString(), 'groovy')
+				} catch (ex) {
+					if (captures?.contains('!')) ex.printStackTrace()
+					sendMessage MiscUtil.block(ex.toString(), 'groovy')
 				}
-			}else{
-				def evaluation
-				try{
-					evaluation = JSONUtil.parse(
+			else {
+				Map<String, Object> evaluation
+				try {
+					evaluation = (Map<String, Object>) JSONUtil.parse(
 						Unirest.post('http://groovyconsole.appspot.com/executor.groovy')
 						.field('script', dea)
 						.asString().body)
-				}catch (ex){
-					formatted('Failed to request evaluation.')
-					return
+				} catch (ignored) {
+					return formatted('Failed to request evaluation.')
 				}
-				String output = ''
-				if (evaluation.executionResult){
-					output += '\n' + "> Result:\n$evaluation.executionResult".block('groovy')
-				}
-				if (evaluation.outputText){
-					output += '\n' + "> Output:\n$evaluation.outputText".block('groovy')
-				}
-				if (evaluation.stacktraceText){
-					output += '\n' + "> Error:\n$evaluation.stacktraceText".block('groovy')
-				}
-				try{
-					sendMessage(output)
-				}catch (ex){
-					Message dong = formatted('Message too long. Uploading JSON result of evaluation...')
-					sendFile(JSONUtil.pjson(evaluation).getBytes('UTF-8'), "evaluation_${message.id}.json")
+				StringBuilder output = new StringBuilder()
+				if (evaluation.executionResult)
+					output.append '\n' append MiscUtil.block("> Result:\n$evaluation.executionResult", 'groovy')
+				if (evaluation.outputText)
+					output.append '\n' append MiscUtil.block("> Output:\n$evaluation.outputText", 'groovy')
+				if (evaluation.stacktraceText)
+					output.append '\n' append MiscUtil.block("> Error:\n$evaluation.stacktraceText", 'groovy')
+				try {
+					sendMessage(output.toString())
+				} catch (ignored) {
+					IMessage dong = formatted('Message too long. Uploading JSON result of evaluation...')
+					sendFile('', new ByteArrayInputStream(JSONUtil.pjson(evaluation).getBytes('UTF-8')),
+							"evaluation_${message.stringID}.json")
 					dong.delete()
 				}
 			}
 		}
 
-		command('template',
-			id: '36',
-			description: 'Custom command templates.',
-			usages: [
-		        ' get (name)': 'Gives you the given template.',
-				' list': 'Gives you a list of templates.',
-				' submit {name} (file or text)': 'Submits a new template.'
-			]){
-			Arguments a = new Arguments(args)
-			whatis(a.next()){
-				when('get'){
-					def x = new File("templates/${a.rest}.ksmt")
-					if (x.exists()) {
-						try {
-							sendFile x
-						} catch (ex) {
-							formatted 'File was too big. Yikes. Try the GitHub repository.'
-						}
-					}else formatted 'File doesn\'t exist.'
-				}
-				when('list'){
-					def l = new File('templates').list().findAll { it.endsWith('ksmt') }
-						.collect { it[0..-6] }
-					formatted l.join(', ')
-				}
-				when('submit'){
-					def n = a.next()
-					def t = json.attachments ? message.attachment.newInputStream().text : a.rest
-					new File("templates/submissions/$n-${json.id}.ksmt").write(t)
-					formatted 'Done.'
-				}
+		command('kismet',
+			id: 39,
+			description: 'Evaluates kismet code.') {
+			try {
+				sendMessage(Kismet.eval(arguments.replaceAll(/^\s*```\w*\s+/, '')
+					.replaceAll(/```\s*$/, '')).toString())
+			} catch (ex) {
+				sendMessage(MiscUtil.block(ex.toString(), 'groovy'))
 			}
 		}
 
-		command(['kismet', ~/kismet(!)/],
-			id: '27',
-			description: 'Evaluates Kismet code. Kismet is a custom language specifically ' +
-				'for this bot. Docs: https://gist.github.com/hlaaftana/51745113c38ef7dd08b6fe83e2b1cabf.',
-			usages: [
-				' (text)': 'The evals it.'
-			]){
-			try{
-				formatted(KarmaFields.parseDiscordKismet(args, [__original_message: message,
-					message: message]).evaluate())
-			}catch (KismetException ex){
-				if (captures.contains('!')) ex.printStackTrace()
-				formatted(ex)
-			}
+		command('kismet!',
+				id: 40,
+				description: 'Evaluates kismet code.') {
+			sendMessage(Kismet.eval(arguments.replaceAll(/^\s*```\w*\s+/, '')
+					.replaceAll(/```\s*$/, '')).toString())
 		}
 
 		command(['showcolor', 'showcolour',
@@ -180,22 +150,20 @@ Packages = undefined, Java = undefined;''')
 				'<(size)> (color)': 'Sets width and height to (size) and shows (color).',
 				'<(width), (height)> (color)': 'Sets width and height individually and shows (color).'
 			],
-			batchable: true){ d ->
+			batchable: true){ CommandEventData d ->
 			def r = Util.resolveColor(d)
-			if (r instanceof String){
-				formatted(r)
-				return
+			if (r instanceof String) return formatted(r)
+			int color = r as int
+			int width = 250
+			int height = 250
+			if (captures) {
+				width = captures[0].toInteger()
+				height = captures.last().toInteger()
 			}
-			int color = r
-			def (width, height) = captures.size() == 1 ?
-				[captures[0], captures[0]]*.toInteger() :
-				captures.size() == 2 ?
-				[captures[0], captures[1]]*.toInteger() :
-				[250, 250]
-			def y = drawColor(color, width, height)
-			try{
-				sendFile(y, filename: 'color.png')
-			}catch (NoPermissionException ex){
+			ByteArrayOutputStream y = drawColor(color, width, height)
+			try {
+				sendFile('', new ByteArrayInputStream(y.toByteArray()), 'color.png')
+			} catch (MissingPermissionsException ignored) {
 				formatted('I don\'t seem to have permissions to send files. ' +
 					'Maybe you need to try in a testing channel?')
 			}
@@ -206,63 +174,10 @@ Packages = undefined, Java = undefined;''')
 			description: 'Interprets JavaScript code.',
 			usages: [' (code)': 'Evaluates the code.']){
 			try{
-				sendMessage(('> ' + jsEngine.eval("String(function(){ $args }())"))
-					.block('js'))
+				sendMessage(MiscUtil.block('> ' + jsEngine.eval("String(function(){ $arguments }())"), 'js'))
 			}catch (ScriptException ex){
-				sendMessage(('> ' + ex).block('js'))
+				sendMessage(MiscUtil.block('> ' + ex, 'js'))
 			}
-		}
-
-		command(['graph'],
-			id: '37',
-			description: 'Graphs code.',
-			usages: [' {x low bound} {x high bound} {marker step} {width} {height} {per pixel} {language} (code)':
-				'Low bound and high bound will be infinite if not numbers. Language is js, ' +
-					'javascript or kismet.']){
-			def run
-			def a = new Arguments(args)
-			def (low, high, step, width, height, pp, lang, code) = [a.next(),
-                a.next(), a.next(),  a.next(), a.next(), a.next(), a.next(), a.rest]
-			low = low.number ? low.toBigDecimal() : null
-			high = high.number ? high.toBigDecimal() : null
-			step = step.toBigDecimal()
-			pp = pp.toBigDecimal()
-			width = (int) Math.min(2000, Math.max(100, width.toInteger()))
-			height = (int) Math.min(2000, Math.max(100, height.toInteger()))
-			if (lang == 'kismet'){
-				def torun = Kismet.parse(code, [x: null])
-				run = { x -> torun.context.getData().x = Kismet.model(x) }
-			}else if (lang == 'js' || lang == 'javascript'){
-				run = { x -> jsEngine.eval(code, new SimpleBindings(x: x)) }
-			}
-			sendFile(filename: "graph-${json.id}.png", Util.draw(width: width * 2 + 1, height: height * 2 + 1){
-				color = new Color(0xFFFFFF)
-				fillRect(0, 0, width * 2 + 1, height * 2 + 1)
-				color = new Color(0)
-				drawLine(width, 0, width, height * 2)
-				drawLine(0, height, width * 2, height)
-				(width / (step / pp)).times {
-					drawLine((int) (width + ((it + 1) * (step / pp))), height - 2,
-						(int) (width + ((it + 1) * (step / pp))), height + 2)
-					drawLine((int) (width - ((it + 1) * (step / pp))), height - 2,
-						(int) (width - ((it + 1) * (step / pp))), height + 2)
-				}
-				(height / (step / pp)).times {
-					drawLine(width - 2, (int) (height + ((it + 1) * (step / pp))),
-							width + 2, (int) (height + ((it + 1) * (step / pp))))
-					drawLine(width - 2, (int) (height - ((it + 1) * (step / pp))),
-							width + 2, (int) (height - ((it + 1) * (step / pp))))
-				}
-				color = new Color(0xff0000)
-				int y0 = run(0) / pp
-				drawLine(width + 1, (int) (height - y0) + 1, width + 1, (int) (height - y0) + 1)
-				width.times {
-					int y1 = run((it + 1) * pp) / pp
-					int y2 = run((-it - 1) * pp) / pp
-					drawLine((int) (width + it + 1), (int) (height - y1), (int) (width + it + 1), (int) (height - y1))
-					drawLine((int) (width - it - 1), (int) (height - y2), (int) (width - it + 1), (int) (height - y2))
-				}
-			})
 		}
 
 		command(['brainfuck', 'bf',
@@ -276,30 +191,30 @@ Packages = undefined, Java = undefined;''')
 					' unicode converts the stack to Unicode characters, char adds 32 and ' +
 					'converts them, while num outputs the number values of the stack.',
 			]){
-			BrainfuckInterpreter.Modes mode = MiscUtil.defaultValueOnException(
+			BrainfuckInterpreter.Modes mode = MiscUtil.<BrainfuckInterpreter.Modes>defaultValueOnException(
 				BrainfuckInterpreter.Modes.CHAR){
-				BrainfuckInterpreter.Modes."${(captures[0] ?: "CHAR").toUpperCase()}"
+				death(captures[0])
 			}
-			def intrp = new BrainfuckInterpreter()
-			boolean done
+			BrainfuckInterpreter intrp = new BrainfuckInterpreter()
+			boolean done = false
 			Thread a = Thread.start {
-				def r = intrp.interpret(args, mode)
-				sendMessage(String.format("""\
+				def r = intrp.interpret(arguments, mode)
+				sendMessage(String.format('''```accesslog
 					|> Output:
 					|%s
 					|> Steps: %d, stack position: %d
-					|> Stack: %s""".stripMargin(),
+					|> Stack: %s```'''.stripMargin(),
 					JSONUtil.json(r), intrp.steps, intrp.stackPosition,
-					intrp.stack.changedValues.collect { k, v -> "[$k:$v]" }
-						.join(' ')).block('accesslog'))
+					intrp.stack[0..intrp.max].withIndex().collect { k, v -> "[$k:$v]" }
+						.join(' ')))
 				done = true
 			}
-			Thread.sleep(5000)
+			Thread.sleep 5000
 			if (!done){
 				a.interrupt()
 				formatted('Evaluation took longer than 5 seconds.\n' +
 					"Steps: $intrp.steps, stack position: $intrp.stackPosition\n" +
-					'Stack: ' + intrp.stack.changedValues.collect { k, v -> "[$k:$v]" }.join(" "))
+					'Stack: ' + intrp.stack.findAll().collect { v, k -> "[$k:$v]" }.join(" "))
 			}
 		}
 
@@ -313,51 +228,51 @@ Packages = undefined, Java = undefined;''')
 			],
 			batchable: true){
 			def text, fn
-			if (json.attachments){
-				text = message.attachment.newInputStream().text
-				fn = message.attachment.name
-			}else if (args){
-				try{
-					URL url = new URL(args)
+			if (message.attachments) {
+				text = message.attachments[0].url.toURL().newInputStream().text
+				fn = message.attachments[0].filename
+			}else if (!arguments || !arguments.startsWith('http')) {
+				IUser user = !arguments ? author : (arguments.long && arguments > '20000000000000000' ?
+						guild.getUserByID(arguments.toLong()) : guild.getUsersByName(arguments)[0])
+				File file = new File("../markovs/${user.stringID}.txt")
+				text = file.text
+				fn = file.name
+			}
+			else if (arguments.startsWith('http'))
+				try {
+					URL url = new URL(arguments)
 					text = url.getText('User-Agent': 'Mozilla/5.0 (Windows NT 10.0; ' +
-							'WOW64; rv:53.0) Gecko/20100101 Firefox/53.0', Accept: '*/*',
+							'WOW64; rv:53.0) Gecko/20100101 Firefox/55.0', Accept: '*/*',
 							Referer: url.toString())
 					fn = url.file
-				}catch (ex){
+				} catch (MalformedURLException ex) {
 					ex.printStackTrace()
-					formatted 'Invalid URL.'
-					return
+					return formatted('Invalid URL.')
 				}
-			}else{
-				formatted 'You need to give a URL or upload a file.'
-				return
-			}
-			List sentences = (text.readLines() - '')*.tokenize()
-			List output = [sentences.sample().sample()]
+			else
+				return formatted('I dont know what you posted bitch.')
+			List<List<String>> sentences = (text.readLines() - '').collect { it.tokenize() }
+			List<String> output = [MiscUtil.sample(MiscUtil.sample(sentences))]
 			int iterations = 0
 			while (true){
-				if (++iterations > 1000){
-					formatted 'Seems I got stuck in a loop.'
-					return
-				}
-				List following = []
-				sentences.each {
-					for (int i = 0; i < it.size(); i++){
-						if (i != 0 && it[i - 1] == output.last())
-							following += it[i]
-					}
-				}
+				if (++iterations > 1000)
+					return formatted('Seems I got stuck in a loop.')
+				List<String> following = []
+				for (s in sentences)
+					for (int i = 0; i < s.size(); i++)
+						if (i != 0 && s[i - 1] == output.last())
+							following.add s[i]
 				if (!following) break
-				else output.add(following.sample())
+				else output.add(MiscUtil.sample(following))
 			}
-			formatted("Markov for $fn:\n" + output.join(' '))
+			formatted "Markov for $fn:\n".concat(output.join(' '))
 		}
 	}
 
-	static OutputStream drawColor(int clr, int width, int height){
+	static ByteArrayOutputStream drawColor(int clr, int width, int height){
 		width = Math.max(Math.min(width, 2500), 120)
 		height = Math.max(Math.min(height, 2500), 120)
-		Util.draw(width: width, height: height){
+		Util.draw(width: width, height: height){ BufferedImage it ->
 			Color c = new Color(clr)
 			int rgb = (c.RGB << 8) >>> 8
 			color = c

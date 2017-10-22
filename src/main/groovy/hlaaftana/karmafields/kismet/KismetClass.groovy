@@ -1,19 +1,41 @@
 package hlaaftana.karmafields.kismet
 
+import groovy.transform.CompileDynamic
+import groovy.transform.CompileStatic
 import groovy.transform.Memoized
 
-class KismetClass {
+@CompileStatic
+class KismetClass implements KismetCallable {
 	static List<KismetClass> instances = []
-	Class orig
-	String name = "anonymous_${instances.size()}"
-	def getter = func { ...a -> a[0].inner()[a[1].inner()] }
-	def setter = func { ...a -> a[0].inner()[a[1].inner()] = a[2] }
-	def caller = func { ...a -> a.size() > 1 ? a[0].inner()(*(a.toList().drop(1))) : a[0].inner()() }
-	def constructor = func { ...a -> }
-	Map<KismetClass, Object> converters = [:];
+	static KismetCallable defaultGetter, defaultSetter, defaultCaller,
+	                      defaultConstructor = func { ...a -> }
 
-	{
-		instances += this
+	@CompileDynamic
+	@SuppressWarnings('all')
+	static void dynamicInstantiator() {
+		defaultGetter = func { KismetObject... a -> ((KismetObject) a[0]).inner()[a[1].inner()] }
+		defaultSetter = func { KismetObject... a -> a[0].inner()[a[1].inner()] = a[2] }
+		defaultCaller = func { KismetObject... a ->
+			a.size() > 1 ? a[0].inner()(a.drop(1) as KismetObject[]) : a[0].inner()()
+		}
+	}
+
+	static { dynamicInstantiator() }
+
+	Class orig
+	String name = 'anonymous_'.concat(instances.size().toString())
+	KismetCallable getter = defaultGetter, setter = defaultSetter,
+	               caller = defaultCaller, constructor = defaultConstructor
+	Map<KismetClass, KismetCallable> converters = [:]
+
+	KismetClass() {
+		instances.add this
+	}
+
+	KismetClass(Class orig, String name) {
+		this()
+		this.orig = orig
+		this.name = name
 	}
 
 	void setName(String n){
@@ -31,21 +53,22 @@ class KismetClass {
 		new MetaKismetClass()
 	}
 
-	def call(...args){
+	KismetObject call(KismetObject... args){
 		def a = new KismetObject(new Expando(), this.object)
-		constructor(*(([a] + args.toList()) as KismetObject[]))
+		constructor.call(([a] as KismetObject[]) + args)
 		a
 	}
 
 	String toString(){ "class($name)" }
 
-	protected static func(Closure a){ new GroovyFunction(x: a, convert: false) }
+	protected static GroovyFunction func(Closure a){ new GroovyFunction(false, a) }
 }
 
+@CompileStatic
 class MetaKismetClass extends KismetClass {
 	{
 		name = 'Class'
-		constructor = func { ...a -> a[0].@inner = new KismetClass() }
+		constructor = func { KismetObject... a -> a[0].@inner = new KismetClass() }
 	}
 
 	KismetObject<KismetClass> getObject() {

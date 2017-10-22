@@ -1,85 +1,82 @@
 package hlaaftana.karmafields
 
-import static hlaaftana.discordg.util.WhatIs.whatis
+import groovy.transform.CompileStatic
 
+@CompileStatic
 class BrainfuckInterpreter {
-	Closure inputMethod = {
-		new Scanner(System.in).next().charAt(0) as int
+	Closure<Integer> inputMethod = {
+		(++new Scanner(System.in)).codePointAt(0)
 	}
 
 	int steps = 0
-	InfiniteList stack = new InfiniteList(0)
+	int[] stack = new int[30000]
 	int stackPosition = 0
+	int max = 0
 
 	def interpret(String code, Modes mode = Modes.CHAR){
-		interpret(toLists(code), mode)
+		interpret(bfTokens(code), mode)
 	}
 
-	def interpret(List code, Modes mode = Modes.CHAR){
+	def interpret(List code, Modes mode = Modes.CHAR) {
 		List output = []
-		code.each { c ->
-			whatis(c){
-				when(List){
-					while (stack[stackPosition]){
-						++steps
-						output += interpret(c, Modes.NUM)
-					}
-				}
-				when '>': {
-					++stackPosition
-					++steps
-				}, '<': {
-					--stackPosition
-					++steps
-				}, '+': {
-					++stack[stackPosition]
-					++steps
-				}, '-': {
-					--stack[stackPosition]
-					++steps
-				}, '.': {
-					output += stack[stackPosition]
-					++steps
-				}, ',': {
-					stack[stackPosition] = inputMethod(this)
+		for (c in code) {
+			if (c instanceof List) {
+				while (stack[stackPosition]) {
+					output.addAll(interpret((List) c, Modes.NUM))
 					++steps
 				}
-			}
+				continue
+			} else if (c == '>')
+				++stackPosition
+			else if (c == '<')
+				--stackPosition
+			else if (c == '+')
+				++stack[stackPosition > max ? (max = stackPosition) : stackPosition]
+			else if (c == '-')
+				--stack[stackPosition > max ? (max = stackPosition) : stackPosition]
+			else if (c == '.')
+				output += stack[stackPosition]
+			else if (c == ',')
+				stack[stackPosition] = inputMethod(this)
+			++steps
 		}
-		mode.run(output)
+		mode.convert(output)
 	}
 
-	private static List toLists(String bf){
+	static int OPEN_BRACKET = '['.codePointAt(0)
+	static int CLOSE_BRACKET = ']'.codePointAt(0)
+	static List bfTokens(String bf){
 		List a = []
 		int howDeep = 0
-		bf.each {
+		PrimitiveIterator.OfInt x = bf.codePoints().iterator()
+		while (x.hasNext()) {
+			int it = x.nextInt()
 			List var = a
-			howDeep.times { var = var.last() }
-			if (it == '['){
+			for (int i = 0; i < howDeep; ++i) var = (List) var.last()
+			if (it == OPEN_BRACKET){
 				++howDeep
 				var.add([])
-			}else if (it == ']'){
-				--howDeep
-			}else{
-				var.add it
-			}
+			}else if (it == CLOSE_BRACKET) --howDeep
+			else var.add it
 		}
 		a
 	}
 
 	enum Modes {
-		CHAR({ l -> l.collect { it + 32 as char }.join() }),
-		NUM({ l -> l }),
-		UNICODE({ l -> l.collect { it as char }.join() })
+		CHAR { def convert(List<Integer> l) {
+			StringBuilder b = new StringBuilder()
+			for (c in l)
+				b.appendCodePoint(c + 32)
+			b.toString()
+		} },
+		NUM { def convert(List<Integer> l) { l } },
+		UNICODE { def convert(List<Integer> l) {
+			StringBuilder b = new StringBuilder()
+			for (c in l)
+				b.appendCodePoint(c)
+			b.toString()
+		} }
 
-		Closure closure
-		Closure<String> joiner
-		Modes(Closure c){
-			closure = c
-		}
-
-		def run(o){
-			closure(o)
-		}
+		abstract convert(List<Integer> l)
 	}
 }

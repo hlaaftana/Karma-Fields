@@ -1,16 +1,19 @@
 package hlaaftana.karmafields.kismet
 
-class KismetObject<T> {
+import groovy.transform.CompileStatic
+
+@CompileStatic
+class KismetObject<T> implements KismetCallable {
 	KismetObject<KismetClass> class_
-	private forbidden = ['class', 'metaClass']
-	private T inner
+	public forbidden = ['class', 'metaClass', 'forbidden']
+	public T inner
 
-	KismetObject(i, c){ this.@inner = i; this.@class_ = c }
-	KismetObject(i){ this.@inner = i }
+	KismetObject(T i, KismetObject<KismetClass> c){ this.@inner = i; this.@class_ = c }
+	KismetObject(T i){ this.@inner = i }
 
-	def inner(){ this.@inner }
+	T inner(){ this.@inner }
 	def forbidden(){ this.@forbidden }
-	def kclass(){ this.@class_ }
+	KismetObject<KismetClass> kclass(){ this.@class_ }
 
 	def getProperty(String name){
 		if (name in forbidden) throw new MissingPropertyException(name, inner().class)
@@ -23,21 +26,32 @@ class KismetObject<T> {
 	}
 
 	def methodMissing(String name, ...args){
-		if (args.every { it instanceof KismetObject }) args = args*.inner()
-		Kismet.model(args ? inner()."$name"(*args) : inner()."$name"())
+		for (int i = 0; i < args.length; ++i)
+			if (args[i] instanceof KismetObject)
+				args[i] = ((KismetObject) args[i]).inner()
+		Kismet.model(args ? inner().invokeMethod(name, args) : inner().invokeMethod(name, null))
 	}
 
 	def methodMissing(String name, Collection args){ methodMissing(name, args as Object[]) }
 	def methodMissing(String name, args){ methodMissing(name, args instanceof Object[] ? args : [args] as Object[]) }
 	def methodMissing(String name, KismetObject args){ methodMissing(name, args.inner()) }
-	def methodMissing(String name, KismetObject... args){ methodMissing(args*.inner()) }
-
-	def call(...args){
-		Kismet.model(kclass().inner().caller.call(this, *(args.collect(Kismet.&model))))
+	def methodMissing(String name, KismetObject... args){
+		Object[] arr = new Object[args.length]
+		for (int i = 0; i < args.length; ++i) arr[i] = args[i].inner()
+		methodMissing(name, (Object[]) arr)
 	}
 
+	KismetObject call(...args){
+		call(args.collect(Kismet.&model) as KismetObject[])
+	}
+
+	KismetObject call(KismetObject... args) {
+		Kismet.model(kclass().inner().caller.call((([this] as KismetObject[]) + args) as KismetObject[]))
+	}
+
+	@CompileStatic
 	def "as"(Class c){
-		def k = KismetModels.defaultConversions[c]?.inner()
+		KismetClass k = KismetModels.defaultConversions[c]?.inner()
 		if (k && kclass().inner().converters.containsKey(k)) kclass().inner().converters[k](this)
 		else inner().asType(c)
 	}

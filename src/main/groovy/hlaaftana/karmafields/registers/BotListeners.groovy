@@ -1,77 +1,55 @@
 package hlaaftana.karmafields.registers
 
-import hlaaftana.discordg.Client
-import hlaaftana.discordg.exceptions.NoPermissionException
-import hlaaftana.discordg.exceptions.MessageInvalidException
-import hlaaftana.discordg.logic.EventData
-import hlaaftana.discordg.objects.Message
-import hlaaftana.discordg.util.JSONUtil
-import hlaaftana.discordg.util.MiscUtil
-import hlaaftana.discordg.util.bot.CommandBot
+import hlaaftana.karmafields.relics.CommandEventData
+import hlaaftana.karmafields.relics.JSONUtil
+import hlaaftana.karmafields.relics.CommandBot
 import hlaaftana.karmafields.CommandRegister
-import hlaaftana.karmafields.DataFile;
+import hlaaftana.karmafields.DataFile
 import hlaaftana.karmafields.KarmaFields
-import hlaaftana.karmafields.Util
-import hlaaftana.karmafields.kismet.Block
-import hlaaftana.karmafields.kismet.Kismet;
+import sx.blah.discord.api.events.IListener
+import sx.blah.discord.handle.impl.events.guild.GuildCreateEvent
+import sx.blah.discord.handle.obj.IRole
+import sx.blah.discord.util.MissingPermissionsException
 
-import static hlaaftana.discordg.util.WhatIs.whatis
+import java.awt.Color
+import java.time.ZoneOffset
 
 class BotListeners extends CommandRegister {
-	static Map eventNames = [
-		join: 'member',
-		leave: 'member_leave'
-	]
 	@Lazy def exceptionPw = new PrintWriter(KarmaFields.exceptionLogFile)
 	
 	def register(){
-		client.listen('server'){
-			MiscUtil.defaultValueOnException {
-				server.role('|><|')?.edit(color: 0x0066c2)
-			}
+		client.dispatcher.registerListener new IListener<GuildCreateEvent>(){
+			@Override
+			void handle(GuildCreateEvent e) {
+				if (System.currentTimeMillis() -
+						e.guild.getJoinTimeForUser(client.ourUser).toInstant(ZoneOffset.UTC).toEpochMilli()
+							> 10000) return
 
-			server.formatted('Looks like I joined. Do |>help or ><help to learn more.')
-			File a = new File("guilds/${server.id}.json")
-			a.createNewFile()
-			if (a.text == ''){
-				JSONUtil.dump(a, [:])
+				try {
+					IRole role = e.guild.getRolesByName('|><|')[0]
+					role?.edit(new Color(0x0066c2), role.hoisted, role.name, role.permissions, role.mentionable)
+				} catch (ignored) {}
+
+				e.guild.generalChannel.sendMessage format('Looks like I joined. Do |>help or ><help to learn more.')
+				File a = new File("guilds/${e.guild.stringID}.json")
+				if (!a.text) JSONUtil.dump(a, [:])
+				KarmaFields.guildData[e.guild.stringID] = new DataFile(a)
 			}
-			KarmaFields.guildData[server.id] = new DataFile(a)
 		}
 
-		bot.listenerSystem.listen(CommandBot.Events.EXCEPTION){
-			if (exception in NoPermissionException){
+		bot.listenerSystem.addListener(CommandBot.Events.EXCEPTION) { CommandEventData d ->
+			if (d.exception instanceof MissingPermissionsException){
 				try{
-					channel.formatted('It seems I don\'t have permissions. ' +
-						(exception.response.message ?
-							'Discord says ' + exception.response.message :
-							'Discord didn\'t say how.'))
-				}catch (NoPermissionException ex){
-					println 'Don\'t have message permissions in ' +
-						channel ' in ' + server
-				}
+					d.channel.sendMessage format('It seems I don\'t have permissions. Discord: ' +
+							((MissingPermissionsException) d.exception).errorMessage)
+				}catch (MissingPermissionsException ignored){}
 			}else{
-				channel.formatted(exception.toString())
-				bot.log.warn "When running command: $message.content"
-				bot.log.warn "Got exception: $exception"
-				KarmaFields.exceptionLogFile.append(message.content + '\r\n')
-				exception.printStackTrace(exceptionPw)
+				d.channel.sendMessage format(d.exception.toString())
+				bot.log.warn "When running command: $d.content"
+				bot.log.warn "Got exception: $d.exception"
+				KarmaFields.exceptionLogFile.append(d.content + '\r\n')
+				d.exception.printStackTrace(exceptionPw)
 				exceptionPw.flush()
-			}
-		}
-		
-		eventNames.each { k, v ->
-			client.listen(v){ e ->
-				server.guildData().listeners.findAll { _, it -> it.event == k }.each { _, it ->
-					Message d = new Message(client, it.message_object)
-					Block x = KarmaFields.parseDiscordKismet(it.code, [__original_message:
-                          Kismet.model(d)] + e.collectEntries { a, b -> [(a): Kismet.model(b)] })
-					try{
-						x.evaluate()
-					}catch (ex){
-						server.formatted "Error with listener $_:\n$ex"
-					}
-				}
 			}
 		}
 	}

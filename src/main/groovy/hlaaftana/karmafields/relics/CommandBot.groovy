@@ -2,6 +2,7 @@ package hlaaftana.karmafields.relics
 
 import groovy.transform.*
 import hlaaftana.karmafields.KarmaFields
+import hlaaftana.kismet.Collections
 import sx.blah.discord.api.ClientBuilder
 import sx.blah.discord.api.IDiscordClient
 import sx.blah.discord.api.events.IListener

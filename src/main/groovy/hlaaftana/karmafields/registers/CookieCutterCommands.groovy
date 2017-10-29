@@ -9,7 +9,7 @@ import hlaaftana.karmafields.relics.MiscUtil
 
 import hlaaftana.karmafields.CommandRegister
 import hlaaftana.karmafields.KarmaFields
-import hlaaftana.karmafields.relics.StringEscaper
+import hlaaftana.kismet.StringEscaper
 
 @CompileStatic
 class CookieCutterCommands extends CommandRegister {

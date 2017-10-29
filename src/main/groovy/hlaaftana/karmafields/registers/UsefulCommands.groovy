@@ -3,7 +3,7 @@ package hlaaftana.karmafields.registers
 import com.mashape.unirest.http.Unirest
 import groovy.transform.CompileDynamic
 import groovy.transform.CompileStatic
-import hlaaftana.karmafields.kismet.Kismet
+import hlaaftana.kismet.Kismet
 import hlaaftana.karmafields.relics.CommandEventData
 import hlaaftana.karmafields.relics.JSONUtil
 import hlaaftana.karmafields.relics.MiscUtil

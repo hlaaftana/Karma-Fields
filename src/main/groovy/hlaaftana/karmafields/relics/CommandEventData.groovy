@@ -2,8 +2,8 @@ package hlaaftana.karmafields.relics
 
 import groovy.transform.CompileDynamic
 import groovy.transform.CompileStatic
-import sx.blah.discord.handle.obj.IChannel
-import sx.blah.discord.handle.obj.IMessage
+import net.dv8tion.jda.core.entities.Message
+import net.dv8tion.jda.core.entities.MessageChannel
 
 @CompileStatic
 class CommandEventData {
@@ -13,11 +13,12 @@ class CommandEventData {
 	String arguments
 	List<String> captures
 	List<String> allCaptures
-	@Delegate IMessage message
+	@Delegate Message message
 	Map<String, Object> extra = [:]
 
-	CommandEventData(Map<String, Object> props = [:], Command command, CommandPattern alias, CommandPattern trigger,
-	                 String arguments, IMessage message) {
+	CommandEventData(Map<String, Object> props = [:], Command command,
+	                 CommandPattern alias, CommandPattern trigger,
+	                 String arguments, Message message) {
 		for (e in props)
 			this[e.key] = e.value
 		this.command = command
@@ -37,18 +38,21 @@ class CommandEventData {
 	}
 
 	@CompileDynamic
-	IMessage formatted(IChannel chan = channel, String content) {
-		chan.sendMessage(command.parent.formatter.call(content))
+	Message formatted(boolean care = false, MessageChannel chan = message.channel, String content) {
+		def x = chan.sendMessage(command.parent.formatter.call(content))
+		care ? x.complete() : x.queue()
 	}
 
 	@CompileDynamic
-	IMessage sendMessage(IChannel chan = channel, ...arguments) {
-		chan.sendMessage(*arguments)
+	Message sendMessage(boolean care = false, MessageChannel chan = message.channel, ...arguments) {
+		def x = chan.sendMessage(*arguments)
+		care ? x.complete() : x.queue()
 	}
 
 	@CompileDynamic
-	IMessage sendFile(IChannel chan = channel, ...arguments) {
-		chan.sendFile(*arguments)
+	Message sendFile(boolean care = false, MessageChannel chan = message.channel, ...arguments) {
+		def x = chan.sendFile(*arguments)
+		care ? x.complete() : x.queue()
 	}
 
 	CommandEventData clone() {

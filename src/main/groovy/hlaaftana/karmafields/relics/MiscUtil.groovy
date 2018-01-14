@@ -75,6 +75,7 @@ class MiscUtil {
 		clipboard.getContents(null).getTransferData(DataFlavor.stringFlavor)
 	}
 
+	@CompileStatic
 	static <T> T defaultValueOnException(T defaultValue = null,
 		Collection<Class> exceptions = [Exception],
 		Closure<T> expr){
@@ -154,6 +155,7 @@ class MiscUtil {
 	/**
 	 * Registers a bunch of methods to help you with Discord formatting to the String meta class.
 	 */
+
 	static registerStringMethods(){
 		MiscUtil.metaClass.methods.findAll {
 			it.declaringClass.theClass == MiscUtil &&

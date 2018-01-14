@@ -1,26 +1,26 @@
-package hlaaftana.karmafields
+package hlaaftana.kf.discordg
 
 import com.mashape.unirest.http.Unirest
 import groovy.transform.CompileStatic
-import hlaaftana.karmafields.relics.CommandEventData
-import hlaaftana.karmafields.relics.ConversionUtil
-import hlaaftana.karmafields.relics.MiscUtil
-import net.dv8tion.jda.core.entities.ChannelType
-import net.dv8tion.jda.core.entities.Message
-import net.dv8tion.jda.core.entities.User
+import hlaaftana.discordg.util.bot.CommandEventData
+import hlaaftana.discordg.util.ConversionUtil
+import hlaaftana.discordg.util.MiscUtil
+import hlaaftana.discordg.objects.Message
+import hlaaftana.discordg.objects.User
 
-import java.awt.Graphics2D
-import java.awt.image.BufferedImage
 import javax.imageio.ImageIO
-import java.time.OffsetDateTime
+import java.awt.*
+import java.awt.image.BufferedImage
+import java.util.regex.Matcher
 
+@CompileStatic
 class Util {
 	static String CHANNEL_ARG_REGEX = /<?#?([\d\w\-]+?)>?/
 	
 	private static Random colorRandom = new Random()
 
-	@CompileStatic
-	static ByteArrayOutputStream draw(Map arguments = [:], @DelegatesTo(Graphics2D) Closure closure){
+	static ByteArrayOutputStream draw(Map arguments = Collections.emptyMap(),
+	                                  @DelegatesTo(Graphics2D) Closure closure) {
 		BufferedImage image = new BufferedImage((arguments.width as Integer) ?: 256,
 			(arguments['height'] as Integer) ?: 256, (arguments.colorType as Integer) ?:
 			BufferedImage.TYPE_INT_RGB)
@@ -35,21 +35,19 @@ class Util {
 		baos
 	}
 
-	static String formatLongUser(User user){ "\"$user.name\"#$user.discriminator ($user.id)" }
+	static String formatLongUser(User user){ "\"$user.name\"#$user.discrim ($user.id)" }
 
-	@CompileStatic
 	static String formatLongMessage(Message msg){
-		OffsetDateTime time = msg.creationTime
+		def time = MiscUtil.dateToLDT(msg.createdAt)
 		String.format("{%s|%s} [%s] <%s>: %s",
 			time.toLocalDate(),
 			time.toLocalTime(),
-			msg.channelType == ChannelType.PRIVATE ? 'DM' :
-			msg.channelType == ChannelType.GROUP ? "group#$msg.channel" :
+			msg.channel.dm ? 'DM' :
+			msg.channel.group ? "group#$msg.channel" :
 				"$msg.guild#$msg.channel",
 			formatLongUser(msg.author), msg.content)
 	}
 
-	@CompileStatic
 	static String uploadToPuush(bytes, String filename = 'a'){
 		Unirest.post('https://puush.me/api/up')
 			.field('k', KarmaFields.creds.get('puush_api_key'))
@@ -58,11 +56,11 @@ class Util {
 			.asString().body.tokenize(',')[1]
 	}
 
-	@CompileStatic
 	static resolveColor(CommandEventData d){
 		int color
-		String arg = d.arguments.toString().trim().replace('#', '')
+		String arg = d.arguments.trim().replace('#', '')
 			.replaceAll(/\s+/, "").toLowerCase()
+		Matcher matches
 		if (arg.toLowerCase() == 'random')
 			color = colorRandom.nextInt(0xFFFFFF)
 		else if (arg.toLowerCase() in ['me', 'my', 'mine'])
@@ -74,14 +72,19 @@ class Util {
 			} catch (NumberFormatException ignored) {
 				return 'Invalid hexadecimal number. Probably too large.'
 			}
-		else if (arg ==~ /(?:rgb\()?[0-9]+,[0-9]+,[0-9]+(?:\))?/){
-			int[] rgb = arg.findAll(/\d+/).collect { it.toInteger() }
-			color = (rgb[0] << 16) | (rgb[1] << 8) | rgb[2]
-		}else if (arg ==~ /\w+/){
+		else if (arg ==~ /\w+/) {
 			if (!MiscUtil.namedColors.containsKey(arg))
 				return 'Invalid named color. List here: "http://www.december.com/html/spec/colorsvg.html"'
 			color = MiscUtil.namedColors[arg]
-		} else return 'What'
+		} else if ((matches = (arg =~ /\d+/)).size() == 3) {
+			int[] rgb = new int[3]
+			int i = 0
+			while (matches.find()) {
+				rgb[i] = Integer.valueOf(matches.group())
+				++i
+			}
+			color = (rgb[0] << 16) | (rgb[1] << 8) | rgb[2]
+		} else return 'Don\'t know how to parse that color.'
 		color
 	}
 }

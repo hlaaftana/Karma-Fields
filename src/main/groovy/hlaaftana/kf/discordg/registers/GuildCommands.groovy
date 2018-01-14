@@ -1,12 +1,12 @@
-package hlaaftana.karmafields.registers
+package hlaaftana.kf.discordg.registers
 
 import groovy.transform.CompileStatic
-import hlaaftana.karmafields.CommandRegister
-import hlaaftana.karmafields.relics.MiscUtil
-import net.dv8tion.jda.core.Permission
-import net.dv8tion.jda.core.entities.Channel
-import net.dv8tion.jda.core.entities.Role
-import net.dv8tion.jda.core.utils.PermissionUtil
+import hlaaftana.kf.discordg.CommandRegister
+import hlaaftana.discordg.util.MiscUtil
+import hlaaftana.discordg.Permissions
+import hlaaftana.discordg.objects.Channel
+import hlaaftana.discordg.objects.Role
+
 import static java.lang.System.currentTimeMillis as now
 
 @CompileStatic
@@ -15,21 +15,20 @@ class GuildCommands extends CommandRegister {
 	
 	static Map<String, Closure<Boolean>> roleOptions = [
 		color: { Role r ->
-			!r.hoisted && !r.permissions && r.color.RGB &&
+			!r.hoist && !r.permissions && r.color.RGB &&
 				r.name ==~ /#?[A-Fa-f0-9]+/
 		},
 		unused: { Role r ->
-			!r.guild.getMembersWithRoles(r)
+			!r.memberIds
 		},
 		no_overwrites: { Role r ->
-			!((r.guild.textChannels as List<Channel>) + (r.guild.voiceChannels as List<Channel>))*.rolePermissionOverrides
-					.any { it.any { it.role.idLong == r.idLong } }
+			!r.guild.channels*.overwrites.any { it.any { it.id == r.id } }
 		},
 		no_permissions: { Role r ->
 			!r.permissions
 		},
 		color_ignore_perms: { Role r ->
-			!r.hoisted && r.color.RGB && r.name ==~ /#?[A-Fa-f0-9]+/
+			!r.hoist && r.color.RGB && r.name ==~ /#?[A-Fa-f0-9]+/
 		}
 	]
 
@@ -58,7 +57,7 @@ class GuildCommands extends CommandRegister {
 			guildOnly: true){
 			def params = captures[0]?.toList() ?: []
 			List<Role> roles = guild.roles
-			roles.remove(guild.publicRole)
+			roles.remove(guild.defaultRole)
 			List<Closure<Boolean>> options = []
 			if (arguments){
 				boolean neg = false
@@ -77,18 +76,18 @@ class GuildCommands extends CommandRegister {
 			} else { options = roleOptions.values() as List<Closure<Boolean>> }
 			for (x in options) roles = roles.findAll(x)
 			if (params.contains('-')){
-				if (!PermissionUtil.checkPermission(member, Permission.MANAGE_ROLES))
+				if (!member.permissions['manageRoles'])
 					return formatted('You don\'t have permissions.')
-				def a = formatted(true, "Deleting ${roles.size()} roles in about ${roles.size() / 2} seconds...")
+				def a = formatted("Deleting ${roles.size()} roles in about ${roles.size() / 2} seconds...")
 				long s = now()
 				if (roles) {
 					for (r in roles.dropRight(1)) {
-						r.delete().queue()
+						r.delete()
 						Thread.sleep 500
 					}
-					roles.last().delete().queue()
+					roles.last().delete()
 				}
-				a.editMessage(MiscUtil.block("> Deleted all ${roles.size()} roles in ${(now() - s) / 1000} seconds.", 'accesslog'))
+				a.edit(MiscUtil.block("> Deleted all ${roles.size()} roles in ${(now() - s) / 1000} seconds.", 'accesslog'))
 			} else formatted("${roles.join(", ")}\n${roles.size()} total")
 		}
 	}

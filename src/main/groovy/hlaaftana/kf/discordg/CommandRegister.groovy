@@ -1,9 +1,9 @@
-package hlaaftana.karmafields
+package hlaaftana.kf.discordg
 
 import groovy.transform.CompileStatic
-import hlaaftana.karmafields.relics.CommandBot
-import hlaaftana.karmafields.relics.CommandEventData
-import net.dv8tion.jda.core.JDA
+import hlaaftana.discordg.Client
+import hlaaftana.discordg.util.bot.CommandBot
+import hlaaftana.discordg.util.bot.CommandEventData
 
 @CompileStatic
 abstract class CommandRegister {
@@ -20,7 +20,7 @@ abstract class CommandRegister {
 	}
 
 	static CommandBot getBot() { KarmaFields.bot }
-	static JDA getClient() { KarmaFields.client }
+	static Client getClient() { KarmaFields.client }
 	static String format(String s) { KarmaFields.format(s) }
 	abstract register()
 }

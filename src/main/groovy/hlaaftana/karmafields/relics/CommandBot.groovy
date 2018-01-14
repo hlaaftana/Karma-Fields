@@ -2,12 +2,13 @@ package hlaaftana.karmafields.relics
 
 import groovy.transform.*
 import hlaaftana.karmafields.KarmaFields
-import hlaaftana.kismet.Collections
-import sx.blah.discord.api.ClientBuilder
-import sx.blah.discord.api.IDiscordClient
-import sx.blah.discord.api.events.IListener
-import sx.blah.discord.handle.impl.events.guild.channel.message.MessageReceivedEvent
-import sx.blah.discord.handle.obj.IMessage
+import net.dv8tion.jda.core.AccountType
+import net.dv8tion.jda.core.JDA
+import net.dv8tion.jda.core.JDABuilder
+import net.dv8tion.jda.core.entities.Message
+import net.dv8tion.jda.core.events.Event
+import net.dv8tion.jda.core.events.message.MessageReceivedEvent
+import net.dv8tion.jda.core.hooks.EventListener
 
 import java.util.regex.Matcher
 import java.util.regex.Pattern
@@ -21,13 +22,13 @@ class CommandBot implements Triggerable {
 	String logName = 'CommandBot'
 	Log log
 	CommandType defaultCommandType = CommandType.PREFIX
-	ClientBuilder builder
-	IDiscordClient client
+	JDABuilder builder
+	JDA client
 	List<Command> commands = []
 	Map<String, Closure> extraCommandArgs = [:]
 	boolean acceptOwnCommands = false
 	boolean loggedIn = false
-	IListener<MessageReceivedEvent> commandListener
+	EventListener commandListener
 	Closure commandRunnerListener
 	Closure exceptionListener
 	Closure<String> formatter
@@ -39,7 +40,7 @@ class CommandBot implements Triggerable {
 			else if (e.key == 'triggers') addTriggers(e.value as Collection)
 			else setProperty(e.key, e.value)
 		if (!log) log = new Log(logName)
-		if (!builder && !client) builder = new ClientBuilder()
+		if (!builder && !client) builder = new JDABuilder(AccountType.BOT)
 	}
 
 	def addCommand(Command command){
@@ -78,7 +79,7 @@ class CommandBot implements Triggerable {
 
 	def login(String token, boolean bot = true){
 		loggedIn = true
-		client = builder.withToken(token).login()
+		client = builder.setToken(token).buildBlocking()
 	}
 
 	/**
@@ -101,21 +102,23 @@ class CommandBot implements Triggerable {
 				listenerSystem.dispatchEvent(Events.EXCEPTION, c)
 			}
 		}
-		commandListener = new IListener<MessageReceivedEvent>() {
+		commandListener = new EventListener() {
 			@Override
-			void handle(MessageReceivedEvent event) {
-				if (!acceptOwnCommands && event.author.longID == client.ourUser.longID) return
+			@CompileStatic
+			void onEvent(Event event) {
+				if (!(event instanceof MessageReceivedEvent) || !acceptOwnCommands &&
+						((MessageReceivedEvent) event).author.idLong == client.selfUser.idLong) return
 				boolean anyPassed = false
-
+				MessageReceivedEvent e = ((MessageReceivedEvent) event)
 				for (c in new ArrayList<Command>(commands)){
 					Tuple2<CommandPattern, CommandPattern> match
-					if ((match = c.match(event.message))){
+					if ((match = c.match(e.message))){
 						anyPassed = true
 
-						CommandEventData ced = new CommandEventData(c, match.first, match.second,
-								c.arguments(event.message), event.message)
-						ced.captures = c.captures(event.message)
-						ced.allCaptures = c.allCaptures(event.message)
+						CommandEventData ced = new CommandEventData(c, match.second, match.first,
+								c.arguments(e.message), e.message)
+						ced.captures = c.captures(e.message)
+						ced.allCaptures = c.allCaptures(e.message)
 
 						listenerSystem.dispatchEvent(Events.COMMAND, ced)
 					}
@@ -124,7 +127,7 @@ class CommandBot implements Triggerable {
 				if (!anyPassed) listenerSystem.dispatchEvent(Events.NO_COMMAND, event)
 			}
 		}
-		client.dispatcher.registerListener(commandListener)
+		client.addEventListener(commandListener)
 		listenerSystem.dispatchEvent(Events.INITIALIZE, null)
 	}
 
@@ -135,7 +138,7 @@ class CommandBot implements Triggerable {
 
 	def uninitialize(){
 		listenerSystem.removeListener(Events.COMMAND, commandRunnerListener)
-		client.dispatcher.unregisterListener(commandListener)
+		client.removeEventListener(commandListener)
 	}
 
 	static enum Events {
@@ -219,18 +222,18 @@ trait Restricted {
 	}
 
 	@CompileDynamic
-	boolean allows(IMessage msg){
+	boolean allows(Message msg){
 		boolean wh = true
 		boolean bl = false
 		if (white) {
 			for (e in whitelist)
 				wh |= !Collections.disjoint(e.value, e.key == 'role' ?
-						msg.author.getRolesForGuild(msg.guild) : [msg."$e.key".id])
+						msg.member.roles : [msg."$e.key".id])
 		}
 		if (black) {
 			for (e in whitelist)
 				bl |= !Collections.disjoint(e.value, e.key == 'role' ?
-						msg.author.getRolesForGuild(msg.guild) : [msg."$e.key".id])
+						msg.member.roles : [msg."$e.key".id])
 		}
 		wh && !bl
 	}
@@ -326,7 +329,7 @@ class Command implements Triggerable, Aliasable, Restricted {
 	}
 
 	/// null if no match
-	Tuple2<CommandPattern, CommandPattern> match(IMessage msg){
+	Tuple2<CommandPattern, CommandPattern> match(Message msg){
 		if (!allows(msg)) return null
 		for (List<CommandPattern> x in (List<List<CommandPattern>>) [triggers, aliases].combinations())
 			if (x[0].allows(msg) && x[1].allows(msg) && msg.content ==~ type.commandMatcher.call(x[0], x[1]))
@@ -337,7 +340,7 @@ class Command implements Triggerable, Aliasable, Restricted {
 	CommandPattern hasAlias(ahh){ for (x in aliases) if (ahh.toString() == x.toString()) return x; null }
 	CommandPattern hasTrigger(ahh){ for (x in triggers) if (ahh.toString() == x.toString()) return x; null }
 
-	Matcher matcher(IMessage msg){
+	Matcher matcher(Message msg){
 		Tuple2 pair = match(msg)
 		if (!pair) return null
 		msg.content =~ type.commandMatcher.call(pair)
@@ -348,7 +351,7 @@ class Command implements Triggerable, Aliasable, Restricted {
 	 * @param d - the event data.
 	 * @return the arguments as a string.
 	 */
-	String arguments(IMessage msg){
+	String arguments(Message msg){
 		try{
 			msg.content.substring(allCaptures(msg)[0].length()).trim()
 		}catch (ignored){
@@ -357,12 +360,12 @@ class Command implements Triggerable, Aliasable, Restricted {
 	}
 
 	// only for regex
-	List captures(IMessage msg){
+	List captures(Message msg){
 		type.customCaptures.call(allCaptures(msg))
 	}
 
 	// only for regex
-	List<String> allCaptures(IMessage msg){
+	List<String> allCaptures(Message msg){
 		def aa = matcher(msg).collect()
 		String[] rid = []
 		if (aa instanceof String) rid = [aa]
@@ -381,10 +384,10 @@ class Command implements Triggerable, Aliasable, Restricted {
 	 * @param d - the event data.
 	 */
 	def run(CommandEventData d){}
-	def run(IMessage msg){}
+	def run(Message msg){}
 
 	def call(CommandEventData d){ run(d); run(d.message) }
-	def call(IMessage msg){ run(msg) }
+	def call(Message msg){ run(msg) }
 }
 
 /**

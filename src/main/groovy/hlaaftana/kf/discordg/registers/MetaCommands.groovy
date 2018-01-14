@@ -1,19 +1,19 @@
-package hlaaftana.karmafields.registers
+package hlaaftana.kf.discordg.registers
 
 import groovy.transform.CompileStatic
-import hlaaftana.karmafields.relics.CommandPattern
-import hlaaftana.karmafields.relics.DSLCommand
-import hlaaftana.karmafields.relics.MiscUtil
-import hlaaftana.karmafields.CommandRegister
-import hlaaftana.karmafields.KarmaFields
-import hlaaftana.karmafields.Util
-import net.dv8tion.jda.core.entities.Message
+import hlaaftana.kf.discordg.CommandRegister
+import hlaaftana.kf.discordg.KarmaFields
+import hlaaftana.kf.discordg.Util
+import hlaaftana.discordg.util.bot.CommandPattern
+import hlaaftana.discordg.util.bot.DSLCommand
+import hlaaftana.discordg.util.MiscUtil
+import hlaaftana.discordg.objects.Message
 
 @CompileStatic
 class MetaCommands extends CommandRegister {
 	{ group = 'Meta' }
 
-	static LinkedHashMap<String, LinkedHashMap> groups = [
+	static LinkedHashMap<String, LinkedHashMap<String, Object>> groups = [
 		Meta: [
 			description: 'Commands about the bot itself.'
 		],
@@ -43,7 +43,7 @@ class MetaCommands extends CommandRegister {
 				' (text)': 'Sends me the text as feedback.'
 			]){
 			try{
-				formatted(false, client.getUserById(98457401363025920).openPrivateChannel().complete(),
+				formatted(client.user(98457401363025920).createOrGetPrivateChannel(),
 						"Feedback by ${Util.formatLongUser(author)}:\n$arguments")
 				formatted('Feedback sent.')
 			}catch (ex){
@@ -60,7 +60,7 @@ class MetaCommands extends CommandRegister {
 			formatted("""Programming language: Groovy
 Author: claude#7436
 Source code: "https://github.com/hlaaftana/Karma-Fields"
-Library: Discord4J ("https://github.com/austinv11/Discord4J") (i actually dont like using this its not expressive enough)
+Library: DiscordG ("https://github.com/hlaaftana/DiscordG")
 Memory usage: ${Runtime.runtime.totalMemory() / (1 << 20)}/${Runtime.runtime.maxMemory() / (1 << 20)}MB
 Invite: https://discordapp.com/oauth2/authorize?client_id=$KarmaFields.appId&scope=bot&permissions=268435456""")
 		}
@@ -96,8 +96,7 @@ ${cmds.collect { i -> "${i.first.join(', ')} [${i.join(' ')}]" }.join('\n')}
 					if (msg.size() < 2000) sendMessage(msg)
 					else sendFile('', new ByteArrayInputStream(msg.getBytes('UTF-8')),
 							"command-help-${((DSLCommand) command).info.id}-${message.id}.txt")
-				}else
-					formatted('Command or group not found.')
+				}else formatted('Command or group not found.')
 			}else{
 				def randomCmd = MiscUtil.sample(bot.commands).alias
 				sendMessage("""```accesslog

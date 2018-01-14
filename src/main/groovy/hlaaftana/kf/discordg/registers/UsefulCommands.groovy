@@ -1,27 +1,26 @@
-package hlaaftana.karmafields.registers
+package hlaaftana.kf.discordg.registers
 
 import com.mashape.unirest.http.Unirest
 import groovy.transform.CompileDynamic
 import groovy.transform.CompileStatic
+import hlaaftana.kf.discordg.BrainfuckInterpreter
+import hlaaftana.kf.discordg.CommandRegister
+import hlaaftana.kf.discordg.Util
+import hlaaftana.discordg.util.bot.CommandEventData
+import hlaaftana.discordg.util.JSONUtil
+import hlaaftana.discordg.util.MiscUtil
 import hlaaftana.kismet.Kismet
-import hlaaftana.karmafields.relics.CommandEventData
-import hlaaftana.karmafields.relics.JSONUtil
-import hlaaftana.karmafields.relics.MiscUtil
-import net.dv8tion.jda.core.entities.Message
-import net.dv8tion.jda.core.entities.User
-import net.dv8tion.jda.core.exceptions.InsufficientPermissionException
-
-import java.awt.image.BufferedImage
-
-import hlaaftana.karmafields.BrainfuckInterpreter
-import hlaaftana.karmafields.CommandRegister
-import hlaaftana.karmafields.Util
-import javax.script.ScriptEngine
-import javax.script.ScriptException
-import java.awt.Color
-import javax.script.ScriptEngineManager
+import hlaaftana.discordg.objects.Message
+import hlaaftana.discordg.objects.User
+import hlaaftana.discordg.exceptions.NoPermissionException
 import org.codehaus.groovy.control.CompilerConfiguration
 import org.codehaus.groovy.control.customizers.ImportCustomizer
+
+import javax.script.ScriptEngine
+import javax.script.ScriptEngineManager
+import java.awt.*
+import java.awt.image.BufferedImage
+import java.util.List
 
 @CompileStatic
 class UsefulCommands extends CommandRegister {
@@ -41,14 +40,14 @@ loadWithNewGlobal = undefined, DataView = undefined, JSAdapter = undefined, Java
 Packages = undefined, Java = undefined;''')
 		ImportCustomizer imports = new ImportCustomizer()
 		imports.addStarImports(
-			'hlaaftana.karmafields.registers',
-			'hlaaftana.karmafields.relics',
-			'hlaaftana.karmafields',
+			'hlaaftana.kf.discordg.registers',
+			'hlaaftana.kf.discordg.relics',
+			'hlaaftana.kf.discordg',
 			'hlaaftana.kismet',
 			'java.awt')
 		imports.addStaticStars(
-			'hlaaftana.karmafields.KarmaFields',
-			'hlaaftana.karmafields.Util'
+			'hlaaftana.kf.discordg.KarmaFields',
+			'hlaaftana.kf.discordg.Util'
 		)
 		imports.addImports(
 			'java.awt.image.BufferedImage',
@@ -71,7 +70,7 @@ Packages = undefined, Java = undefined;''')
 			String dea = arguments
 				.replaceAll(/^```\w*\n/, '')
 				.replaceAll(/```$/, '')
-			if (author.idLong == 98457401363025920 &&
+			if (author.id == '98457401363025920' &&
 				trigger.toString() != '><')
 				try {
 					sendMessage MiscUtil.block('> ' + new GroovyShell(
@@ -102,7 +101,7 @@ Packages = undefined, Java = undefined;''')
 				try {
 					sendMessage(output.toString())
 				} catch (ignored) {
-					Message dong = formatted(true, 'Message too long. Uploading JSON result of evaluation...')
+					Message dong = formatted 'Message too long. Uploading JSON result of evaluation...'
 					sendFile('', new ByteArrayInputStream(JSONUtil.pjson(evaluation).getBytes('UTF-8')),
 							"evaluation_${message.id}.json")
 					dong.delete()
@@ -139,7 +138,7 @@ Packages = undefined, Java = undefined;''')
 		command('kismet!',
 				id: 40,
 				description: 'Evaluates kismet code.') {
-			if (author.idLong != 98457401363025920) return formatted('Who le hall are you')
+			if (author.id != '98457401363025920') return formatted('Who le hall are you')
 			sendMessage(Kismet.eval(arguments.replaceAll(/^\s*```\w*\s+/, '')
 					.replaceAll(/```\s*$/, '')).toString())
 		}
@@ -169,7 +168,7 @@ Packages = undefined, Java = undefined;''')
 			ByteArrayOutputStream y = drawColor(color, width, height)
 			try {
 				sendFile('', new ByteArrayInputStream(y.toByteArray()), 'color.png')
-			} catch (InsufficientPermissionException ignored) {
+			} catch (NoPermissionException ignored) {
 				formatted('I don\'t seem to have permissions to send files. ' +
 					'Maybe you need to try in a testing channel?')
 			}
@@ -204,11 +203,11 @@ Packages = undefined, Java = undefined;''')
 					' unicode converts the stack to Unicode characters, char adds 32 and ' +
 					'converts them, while num outputs the number values of the stack.',
 			]){
-			BrainfuckInterpreter.Modes mode = MiscUtil.<BrainfuckInterpreter.Modes>defaultValueOnException(
+			def mode = MiscUtil.<BrainfuckInterpreter.Modes>defaultValueOnException(
 				BrainfuckInterpreter.Modes.CHAR){
 				death(captures[0])
 			}
-			BrainfuckInterpreter intrp = new BrainfuckInterpreter()
+			def intrp = new BrainfuckInterpreter()
 			boolean done = false
 			Thread a = Thread.start {
 				def r = intrp.interpret(arguments, mode)
@@ -245,9 +244,7 @@ Packages = undefined, Java = undefined;''')
 				text = message.attachments[0].url.toURL().newInputStream().text
 				fn = message.attachments[0].fileName
 			} else if (!arguments || !arguments.startsWith('http')) {
-				User user = !arguments ? author : (arguments.long && arguments > '20000000000000000' ?
-						guild.getMemberById(arguments.toLong()).user :
-						guild.getMembersByEffectiveName(arguments, false)[0].user)
+				User user = !arguments ? author : guild.member(arguments).user
 				File file = new File("../markovs/${user.id}.txt")
 				text = file.text
 				fn = file.name

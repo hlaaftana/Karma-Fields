@@ -1,14 +1,13 @@
-package hlaaftana.karmafields.registers
+package hlaaftana.kf.discordg.registers
 
 import groovy.json.JsonOutput
 import groovy.transform.CompileStatic
-import hlaaftana.karmafields.relics.CasingType
-import hlaaftana.karmafields.relics.JSONSimpleHTTP
-import hlaaftana.karmafields.relics.JSONUtil
-import hlaaftana.karmafields.relics.MiscUtil
-
-import hlaaftana.karmafields.CommandRegister
-import hlaaftana.karmafields.KarmaFields
+import hlaaftana.kf.discordg.CommandRegister
+import hlaaftana.kf.discordg.KarmaFields
+import hlaaftana.discordg.util.CasingType
+import hlaaftana.discordg.util.JSONSimpleHTTP
+import hlaaftana.discordg.util.JSONUtil
+import hlaaftana.discordg.util.MiscUtil
 import hlaaftana.kismet.StringEscaper
 
 @CompileStatic
@@ -111,20 +110,20 @@ class CookieCutterCommands extends CommandRegister {
 			~/convertcase<(\w+)(?:\s*,\s*|\s+)(\w+)>/],
 			id: '17',
 			description: 'Converts text to a given case type. Case types are: ' +
-				CasingType.defaultCases.keySet().join(', '),
+				CasingType.declaredFields.findAll { it.type == CasingType }*.name*.toLowerCase().join(', '),
 			usages: [
 				'<casefrom[,] caseto> ...': 'Converts the text to caseto assuming the text is casefrom.',
 				'<...> (text)': 'Converts the text.',
 				'<...> (file)': 'Converts the text in the file and uploads a file.'
 			]){
 			if (captures.size() != 2) return formatted('Invalid cases. Case types: ' +
-				CasingType.defaultCases.keySet().join(', '))
-			CasingType from = CasingType.defaultCases[captures[0]], to = CasingType.defaultCases[captures[1]]
+					CasingType.declaredFields.findAll { it.type == CasingType }*.name*.toLowerCase().join(', '),)
+			CasingType from = (CasingType) CasingType[captures[0]], to = (CasingType) CasingType[captures[1]]
 			if (null == from || null == to) return formatted('Invalid cases.')
-			def text = message.attachments ? message.attachments[0].url.toURL().newInputStream().text : arguments
-			text = from.convert(text, to)
+			def text = null != message.attachment ? message.attachment.url.toURL().newInputStream().text : arguments
+			text = from.to(to, text)
 			if (text == null) return formatted('Invalid cases.')
-			boolean file = text.size() > 1000 || message.attachments
+			boolean file = text.size() > 1000 || null != message.attachment
 			if (file) sendFile('', new ByteArrayInputStream(text.getBytes('UTF-8')),
 					"convertcase-$from-$to-${message.id}.txt")
 			else formatted(text)
@@ -145,15 +144,15 @@ class CookieCutterCommands extends CommandRegister {
 			]){
 			def x = System.currentTimeMillis()
 			def text = 'Man i love dicsord4j.'
-			def m = formatted(true, text)
+			def m = formatted(text)
 			def y = System.currentTimeMillis()
 			def b = y - x
 			text += "\nSent after $b ms."
-			m.editMessage(MiscUtil.block(KarmaFields.format(text), 'accesslog')).queue()
+			m.edit(MiscUtil.block(KarmaFields.format(text), 'accesslog'))
 			def z = System.currentTimeMillis()
 			def c = z - y
 			text += "\nEdited after $c ms."
-			m.editMessage(MiscUtil.block(KarmaFields.format(text), 'accesslog')).queue()
+			m.edit(MiscUtil.block(KarmaFields.format(text), 'accesslog'))
 		}
 	}
 }

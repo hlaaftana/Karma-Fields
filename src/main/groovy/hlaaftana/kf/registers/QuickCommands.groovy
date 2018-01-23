@@ -8,11 +8,24 @@ import hlaaftana.discordg.util.CasingType
 import hlaaftana.discordg.util.JSONSimpleHTTP
 import hlaaftana.discordg.util.JSONUtil
 import hlaaftana.discordg.util.MiscUtil
+import hlaaftana.kf.Util
 import hlaaftana.kismet.StringEscaper
 
 @CompileStatic
-class CookieCutterCommands extends CommandRegister {
-	{ group = 'Cookie-cutter' }
+class QuickCommands extends CommandRegister {
+	{ group = 'Quick' }
+
+	@CompileStatic
+	static class LongmanResult {
+		String headword
+		String partOfSpeech
+		List<String> examples = []
+		List<String> definitions = []
+		List<Pronunciation> pronunciations = []
+	}
+
+	@CompileStatic
+	static class Pronunciation { String lang, ipa }
 
 	def register(){
 		command('cleverbot',
@@ -32,21 +45,42 @@ class CookieCutterCommands extends CommandRegister {
 				' (word)': 'Looks up the given word.',
 				'<(n)> (word)': 'Looks up the nth entry for the word.'
 			]){
-			Map x = (Map<String, Object>) JSONSimpleHTTP.get('http://api.pearson.com/v2/dictionaries/' +
-				'ldoce5/entries?headword=' + URLEncoder.encode(arguments, 'UTF-8'))
-			def n = captures[0] ? Math.min(Math.max((int) x.offset + (int) x.count - 1, 0),
-				Math.max((int) captures[0].toInteger() - 1, 0)) : 0
-			Map r = (Map) ((List) x.results)[n]
-			if (!r) return formatted('No entry found.')
-			def (word, pos, definition, example) = [r.headword,
-				r.part_of_speech ? ' (' + r.part_of_speech.toString() + ')' : '',
-	            ((List) ((List<Map>) r.senses)[0].definition).join('; '),
-	            ((List<Map>) ((List<Map>) r.senses)[0].examples).collect { StringEscaper.escapeSoda((String) it.text) }
-                    ?.join('\r') ?: '']
-			def ipas = ((List<Map>) r.pronunciations).collect { it.lang ? "$it.lang: /$it.ipa/" :
+			final request = (Map<String, Object>) JSONSimpleHTTP.get(
+					'http://api.pearson.com/v2/dictionaries/ldoce5/entries?headword=' +
+							URLEncoder.encode(arguments, 'UTF-8'))
+			final resultNumber = captures ? Math.min(Math.max((int) request.offset + (int) request.count - 1, 0),
+					Math.max((int) captures[0].toInteger() - 1, 0)) : 0
+			final result = ((List<Map<String, Object>>) (request.results ?: []))[resultNumber]
+			if (null == result) return formatted('No entry found.')
+			final r = new LongmanResult()
+			r.headword = (String) result.headword
+			r.partOfSpeech = (String) result.part_of_speech
+			if (result.senses) {
+				final s = ((List<Map<String, Object>>) result.senses)[0]
+				if (s.definition) {
+					for (a in s.definition) r.definitions.add((String) a)
+				}
+				if (s.examples) {
+					for (e in s.examples)
+						r.examples.add(((Map<String, String>) e).text)
+				}
+			}
+			if (result.pronunciations) {
+				for (p in result.pronunciations) {
+					final pr = (Map<String, String>) p
+					r.pronunciations.add(new Pronunciation(lang: pr.lang, ipa: pr.ipa))
+				}
+			}
+			final word = r.headword
+			final pos = r.partOfSpeech ? " ($r.partOfSpeech)" : ''
+			final de1 = r.definitions.join('\n')
+			final de = de1 ? '\n' + de1 : de1
+	        final ex1 = r.examples.collect(Util.&quote).join('\n')
+			final ex = ex1 ? '\n' + ex1 : ex1
+			final ipa = r.pronunciations.collect { it.lang ? "$it.lang: /$it.ipa/" :
 				"/$it.ipa/" }.join(", ")
-			if (ipas) ipas = " [$ipas]"
-			formatted("$word$pos$ipas:\r$definition\r$example")
+			final ipas = ipa ? " [$ipa]" : ipa
+			respond(MiscUtil.block("> $word$pos:$ipas$de$ex", 'accesslog'))
 		}
 
 		command('urlencode',
@@ -116,7 +150,7 @@ class CookieCutterCommands extends CommandRegister {
 				'<...> (text)': 'Converts the text.',
 				'<...> (file)': 'Converts the text in the file and uploads a file.'
 			]){
-			if (captures.size() != 2) return formatted('Invalid cases. Case types: ' +
+			if (captures?.size() != 2) return formatted('Invalid cases. Case types: ' +
 					CasingType.declaredFields.findAll { it.type == CasingType }*.name*.toLowerCase().join(', '),)
 			CasingType from = (CasingType) CasingType[captures[0]], to = (CasingType) CasingType[captures[1]]
 			if (null == from || null == to) return formatted('Invalid cases.')

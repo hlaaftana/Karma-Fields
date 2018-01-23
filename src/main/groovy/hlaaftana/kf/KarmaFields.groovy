@@ -1,14 +1,13 @@
 package hlaaftana.kf
 
 import groovy.transform.CompileStatic
-import hlaaftana.discordg.objects.Channel
 import hlaaftana.discordg.objects.Invite
-import hlaaftana.discordg.objects.User
 import hlaaftana.discordg.util.Log
 import hlaaftana.discordg.util.bot.CleverbotDotIO
 import hlaaftana.discordg.util.bot.CommandBot
 import hlaaftana.discordg.util.bot.CommandEventData
 import hlaaftana.discordg.util.MiscUtil
+import hlaaftana.discordg.util.bot.CommandType
 import hlaaftana.discordg.util.bot.DSLCommand
 import hlaaftana.kf.registers.*
 import hlaaftana.discordg.*
@@ -28,10 +27,10 @@ class KarmaFields {
 		'32': 'has_permission message.author message.channel "manageGuild"'
 	].collectEntries { k, v -> [(k): ] }*/
 	static DataFile creds = new DataFile('creds.json')
-	static Client client = DiscordG.withToken((String) creds.get('token'))
+	static Client client = new Client(token: creds.<String>get('token'))
 	static boolean ready
-	static CommandBot bot = new CommandBot(logName: '|><|Bot', triggers: ['|>', '><'], client: client, formatter: this.&format,
-		extraCommandArgs: [guildData: { CommandEventData e -> guildData[e.guild.id] }])
+	static CommandBot bot = new CommandBot(logName: '|><|Bot', triggers: ['P!', 'poo! '], client: client,
+		formatter: this.&format, extraCommandArgs: [guildData: { CommandEventData e -> guildData[e.guild.id] }])
 	static String appId = creds.<String>get('app_id')
 	static List<CommandRegister> registers = []
 	static CleverbotDotIO cleverbot = new CleverbotDotIO(
@@ -44,7 +43,7 @@ class KarmaFields {
 		MiscUtil.registerStaticMethods()
 
 		client.addListener 'ready', {
-			client.play '⌀'
+			client.play 'poo! help'
 			client.fields.oldInvites = (List<Invite>) client.guild(287659842330558464).channels.collectMany {
 				if (!it.permissionsFor(client)['manageChannel']) return Collections.emptyList()
 
@@ -65,8 +64,8 @@ class KarmaFields {
 
 		bot.log.formatter = client.log.formatter = { Log.Message message ->
 			String.format('[%s] [%s]: %s',
-				message.level.name.toUpperCase(),
-				message.by, message.content)
+					message.level.name.toUpperCase(),
+					message.by, message.content)
 		}
 	}
 
@@ -87,7 +86,7 @@ class KarmaFields {
 	static run(){
 		for (Class<? extends CommandRegister> it in [BotListeners, MetaCommands,
 		                                             GuildCommands, UsefulCommands,
-		                                             CookieCutterCommands]) {
+		                                             QuickCommands]) {
 			def r = it.newInstance()
 			registers.add(r)
 			if (!r.registerAfterReady) r.register()
@@ -95,6 +94,7 @@ class KarmaFields {
 
 		bot.initialize()
 		bot.listenerSystem.removeListener(CommandBot.Events.EXCEPTION, bot.exceptionListener)
+		client.login()
 	}
 
 	static main(args){

@@ -7,6 +7,7 @@ import hlaaftana.discordg.util.ConversionUtil
 import hlaaftana.discordg.util.MiscUtil
 import hlaaftana.discordg.objects.Message
 import hlaaftana.discordg.objects.User
+import hlaaftana.kismet.StringEscaper
 
 import javax.imageio.ImageIO
 import java.awt.*
@@ -33,6 +34,15 @@ class Util {
 		ByteArrayOutputStream baos = new ByteArrayOutputStream()
 		ImageIO.write(image, (arguments.imageType?.toString()) ?: 'png', baos)
 		baos
+	}
+
+	static String quote(String a) {
+		final x = StringEscaper.escapeSoda(a)
+		final chars = new char[2 + x.length()]
+		chars[0] = chars[chars.length - 1] = (char) '"'
+		final xc = x.chars
+		System.arraycopy(xc, 0, chars, 1, xc.length)
+		String.valueOf(chars)
 	}
 
 	static String formatLongUser(User user){ "\"$user.name\"#$user.discrim ($user.id)" }

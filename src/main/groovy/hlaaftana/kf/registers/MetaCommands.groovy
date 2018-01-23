@@ -23,11 +23,8 @@ class MetaCommands extends CommandRegister {
 		Guild: [
 			description: 'Commands to use in guilds.'
 		],
-		'Cookie-cutter': [
-			description: 'Commands you can find in other bots, or commands that lack in use.'
-		],
-		Custom: [
-			description: 'Commands written in Kismet and made by users in a guild.'
+		Quick: [
+			description: 'Commands that have easy functionality.'
 		]
 	]
 
@@ -100,13 +97,13 @@ ${cmds.collect { i -> "${i.second.join(', ')} [${i.first.join(' ')}]" }.join('\n
 			}else{
 				def randomCmd = MiscUtil.sample(bot.commands).alias
 				sendMessage("""```accesslog
-> My prefixes are |> and ><, meaning when you call a command you have to put one of those before the command name (no space).
+> My prefixes are "P!" and "poo! ", meaning when you call a command you have to put one of those before the command name.
 > For example: "$trigger$alias" calls this command, and "$trigger$alias $randomCmd" calls this command with the arguments "$randomCmd".
 > In command usages, {} implies the argument can be put in quotes and has to be if it has spaces,
 > [] implies it's optional, () implies it doesn't use quotes, | implies different choices,
 > ... implies more arguments to follow.
-> Some commands use guild properties, use "$trigger$alias property list" to get a list.
-> Commands are sectioned via groups. Unfortunately I can't list every command here, so I'm just gonna list the groups and you can do "$trigger$alias (groupname)" to list its commands.
+> Commands are sectioned via groups. Unfortunately I can't list every command here, so I'm just gonna list the groups.
+> You can do "$trigger$alias (groupname)" to list a groups commands. For example, try "$trigger$alias ${MiscUtil.sample(groups.keySet())}".
 >${'-' * 20}<
 ${groups.collect { k, v -> "> $k: $v.description" }.join('\n')}
 ```""")
@@ -128,8 +125,8 @@ ${groups.collect { k, v -> "> $k: $v.description" }.join('\n')}
 			output += """
 >${'-' * 20}<
 > Usages:
-""" + command.info.usages.collect { k, v ->
-				"$preferredTrigger$preferredName$k / $v"
+""" + command.info.usages.collect { Map.Entry e ->
+				"$preferredTrigger$preferredName$e.key / $e.value"
 			}.join('\n')
 		}
 		if (command.info.examples) {

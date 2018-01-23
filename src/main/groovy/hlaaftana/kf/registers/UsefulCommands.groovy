@@ -3,6 +3,8 @@ package hlaaftana.kf.registers
 import com.mashape.unirest.http.Unirest
 import groovy.transform.CompileDynamic
 import groovy.transform.CompileStatic
+import hlaaftana.discordg.DiscordObject
+import hlaaftana.discordg.objects.User
 import hlaaftana.kf.BrainfuckInterpreter
 import hlaaftana.kf.CommandRegister
 import hlaaftana.kf.Util
@@ -11,13 +13,13 @@ import hlaaftana.discordg.util.JSONUtil
 import hlaaftana.discordg.util.MiscUtil
 import hlaaftana.kismet.Kismet
 import hlaaftana.discordg.objects.Message
-import hlaaftana.discordg.objects.User
 import hlaaftana.discordg.exceptions.NoPermissionException
 import org.codehaus.groovy.control.CompilerConfiguration
 import org.codehaus.groovy.control.customizers.ImportCustomizer
 
 import javax.script.ScriptEngine
 import javax.script.ScriptEngineManager
+import javax.script.SimpleBindings
 import java.awt.*
 import java.awt.image.BufferedImage
 import java.util.List
@@ -27,10 +29,10 @@ class UsefulCommands extends CommandRegister {
 	{ group = 'Useful' }
 	static ScriptEngine jsEngine = new ScriptEngineManager().getEngineByName('javascript')
 	static CompilerConfiguration cc = new CompilerConfiguration()
+	static final File markovFolder = new File('../markovs')
 
-	@CompileDynamic
 	static BrainfuckInterpreter.Modes death(String name) {
-		BrainfuckInterpreter.Modes."${(name ?: "CHAR").toUpperCase()}"
+		BrainfuckInterpreter.Modes.valueOf((name ?: "CHAR").toUpperCase())
 	}
 
 	static {
@@ -113,7 +115,7 @@ Packages = undefined, Java = undefined;''')
 			id: 39,
 			description: 'Evaluates Kismet code. Kismet examples and source: https://github.com/hlaaftana/Kismet',
 			examples: [
-				' |> 33 [band 42] [div 6] [range 1] [join "\\n"]',
+				' |> 33 [bit_and 42] [div 6] [range 1] [join "\\n"]',
 				' product [range 1 100]'
 			]) {
 			try {
@@ -178,10 +180,43 @@ Packages = undefined, Java = undefined;''')
 		command(['javascript', 'js'],
 			id: '34',
 			description: 'Interprets JavaScript code.',
-			usages: [' (code)': 'Evaluates the code.']){
+			usages: [' (code)': 'Evaluates the code. Note you have to add return to the end.']){
 			try {
 				def t = Thread.start {
-					sendMessage(MiscUtil.block('> ' + jsEngine.eval("String(function(){ $arguments }())"), 'js'))
+					try {
+						sendMessage(MiscUtil.block('> ' + jsEngine.eval("String(function(){ $arguments }())"), 'js'))
+					} catch (ex) {
+						sendMessage(MiscUtil.block('> ' + ex, 'js'))
+					}
+				}
+				Thread.sleep(12000)
+				if (t.alive) {
+					t.interrupt()
+					formatted('Code ran for more than 12 seconds.')
+				}
+			} catch (ex) {
+				sendMessage(MiscUtil.block(ex.toString(), 'js'))
+			}
+		}
+
+		command(['livescript', 'ls'],
+				id: '40',
+				description: 'Interprets LiveScript ("https://livescript.net/") code.',
+				usages: [' (code)': 'Evaluates the code. Note you have to add return to the end.']){
+			try {
+				final file = new File("temp/${System.currentTimeMillis()}.ls")
+				file.write(arguments)
+				final cmd = "lsc.cmd -c -p \"$file.absolutePath\"".execute()
+				if (cmd.err.text) return formatted('> Livescript error:\n' + cmd.err.text)
+				final code = cmd.text
+				def t = Thread.start {
+					try {
+						final result = jsEngine.eval(code)
+						final str = jsEngine.eval("String(result)", new SimpleBindings(result: result))
+						sendMessage(MiscUtil.block('> ' + str, 'js'))
+					} catch (ex) {
+						sendMessage(MiscUtil.block('> ' + ex, 'js'))
+					}
 				}
 				Thread.sleep(12000)
 				if (t.alive) {
@@ -236,33 +271,35 @@ Packages = undefined, Java = undefined;''')
 			id: '10',
 			description: 'Generates a sentence based off of order of words from text.',
 			usages: [
-				' (file)': 'Generates a sentence from the given file.',
-				' (url)': 'Generates a sentence from the given URL.'
+				' (file)': 'Generates a sentence from the given file (<=5mb).',
+				' (user)': 'Generates a sentence from old user logs if i have their logs.',
 			],
 			batchable: true){
 			def text, fn
 			if (message.attachments) {
-				text = message.attachments[0].url.toURL().newInputStream().text
-				fn = message.attachments[0].fileName
-			} else if (!arguments || !arguments.startsWith('http')) {
-				User user = !arguments ? author : guild.member(arguments)?.user
-				if (null == user) return formatted("i duno what that is bo")
-				File file = new File("../markovs/${user.id}.txt")
+				final attach = message.attachment
+				if (attach.size > 5120)
+					return formatted("file size was $attach.size bytes but i need it to be less than 5 mb")
+				final f = new File(markovFolder, "${attach.size}b - $attach.filename")
+				if (f.exists() && f.size() == attach.size) text = f.text
+				else f.write(text = attach.url.toURL().newInputStream().text)
+				fn = attach.filename
+			} else {
+				final user = !arguments ? author : DiscordObject.isId(arguments) ?
+						new DiscordObject(null, [id: arguments, name: arguments]) : guild?.findMember(guild?.memberCache, arguments)
+				if (null == user) return formatted("i duno what that is girl")
+				final file = new File(markovFolder, "${user.id}.txt")
 				text = file.text
-				fn = file.name
+				fn = user.name
 			}
-			else if (arguments.startsWith('http')) try {
-				URL url = new URL(arguments)
-				text = url.getText('User-Agent': 'Mozilla/5.0 (Windows NT 10.0; ' +
-						'WOW64; rv:53.0) Gecko/20100101 Firefox/55.0', Accept: '*/*',
-						Referer: url.toString())
-				fn = url.file
-			} catch (MalformedURLException ex) {
-				ex.printStackTrace()
-				return formatted('Invalid URL.')
-			} else return formatted('I dont know what you posted bitch.')
-			List<List<String>> sentences = (text.readLines() - '').collect { it.tokenize() }
-			List<String> output = [MiscUtil.sample(MiscUtil.sample(sentences))]
+			final lines = text.readLines()
+			List<List<String>> sentences = new ArrayList<List<String>>(lines.size().intdiv(4).intValue())
+			for (l in lines) {
+				final t = l.tokenize()
+				if (!t.empty) sentences.add(t)
+			}
+			List<String> output = new ArrayList<String>()
+			output.add(MiscUtil.sample(MiscUtil.sample(sentences)))
 			int iterations = 0
 			while (true){
 				if (++iterations > 1000) return formatted('Seems I got stuck in a loop.')

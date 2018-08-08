@@ -9,7 +9,7 @@ import hlaaftana.discordg.util.JSONSimpleHTTP
 import hlaaftana.discordg.util.JSONUtil
 import hlaaftana.discordg.util.MiscUtil
 import hlaaftana.kf.Util
-import hlaaftana.kismet.StringEscaper
+import hlaaftana.kismet.parser.StringEscaper
 
 @CompileStatic
 class QuickCommands extends CommandRegister {
@@ -34,7 +34,7 @@ class QuickCommands extends CommandRegister {
 			usages: [
 				' (text)': 'Talks to Cleverbot.'
 			]){
-			formatted(KarmaFields.cleverbot.ask(arguments))
+			respond(KarmaFields.cleverbot.ask(arguments))
 		}
 
 		command(['word',
@@ -51,7 +51,7 @@ class QuickCommands extends CommandRegister {
 			final resultNumber = captures ? Math.min(Math.max((int) request.offset + (int) request.count - 1, 0),
 					Math.max((int) captures[0].toInteger() - 1, 0)) : 0
 			final result = ((List<Map<String, Object>>) (request.results ?: []))[resultNumber]
-			if (null == result) return formatted('No entry found.')
+			if (null == result) return respond('no entry found')
 			final r = new LongmanResult()
 			r.headword = (String) result.headword
 			r.partOfSpeech = (String) result.part_of_speech
@@ -75,12 +75,12 @@ class QuickCommands extends CommandRegister {
 			final pos = r.partOfSpeech ? " ($r.partOfSpeech)" : ''
 			final de1 = r.definitions.join('\n')
 			final de = de1 ? '\n' + de1 : de1
-	        final ex1 = r.examples.collect(Util.&quote).join('\n')
+	        final ex1 = r.examples.collect(Util.&doubleQuote).join('\n')
 			final ex = ex1 ? '\n' + ex1 : ex1
 			final ipa = r.pronunciations.collect { it.lang ? "$it.lang: /$it.ipa/" :
 				"/$it.ipa/" }.join(", ")
 			final ipas = ipa ? " [$ipa]" : ipa
-			respond(MiscUtil.block("> $word$pos:$ipas$de$ex", 'accesslog'))
+			respond("$word$pos:$ipas$de$ex")
 		}
 
 		command('urlencode',
@@ -94,7 +94,7 @@ class QuickCommands extends CommandRegister {
 			text = URLEncoder.encode(text, 'UTF-8')
 			boolean file = text.size() > 1000 || message.attachments
 			if (file) sendFile('', new ByteArrayInputStream(text.getBytes('UTF-8')), "$alias-${message.id}.txt")
-			else formatted(StringEscaper.escapeSoda(text))
+			else respond(StringEscaper.escape(text))
 		}
 
 		command('urldecode',
@@ -108,7 +108,7 @@ class QuickCommands extends CommandRegister {
 			text = URLDecoder.decode(text, 'UTF-8')
 			boolean file = text.size() > 1000 || message.attachments
 			if (file) sendFile('', new ByteArrayInputStream(text.getBytes('UTF-8')), "$alias-${message.id}.txt")
-			else formatted(StringEscaper.escapeSoda(text))
+			else respond(StringEscaper.escape(text))
 		}
 
 		command(['encodejson', 'jsonize', 'jsonify'],
@@ -123,7 +123,7 @@ class QuickCommands extends CommandRegister {
 			boolean file = text.size() > 1000 || message.attachments
 			if (file) sendFile('', new ByteArrayInputStream(text.getBytes('UTF-8')),
 					"$alias-${message.id}.txt")
-			else formatted(text)
+			else respond(text)
 		}
 
 		command(['prettyjson', 'ppjson'],
@@ -150,17 +150,17 @@ class QuickCommands extends CommandRegister {
 				'<...> (text)': 'Converts the text.',
 				'<...> (file)': 'Converts the text in the file and uploads a file.'
 			]){
-			if (captures?.size() != 2) return formatted('Invalid cases. Case types: ' +
+			if (captures?.size() != 2) return respond('Invalid cases. Case types: ' +
 					CasingType.declaredFields.findAll { it.type == CasingType }*.name*.toLowerCase().join(', '),)
 			CasingType from = (CasingType) CasingType[captures[0]], to = (CasingType) CasingType[captures[1]]
-			if (null == from || null == to) return formatted('Invalid cases.')
+			if (null == from || null == to) return respond('Invalid cases.')
 			def text = null != message.attachment ? message.attachment.url.toURL().newInputStream().text : arguments
 			text = from.to(to, text)
-			if (text == null) return formatted('Invalid cases.')
+			if (text == null) return respond('Invalid cases.')
 			boolean file = text.size() > 1000 || null != message.attachment
 			if (file) sendFile('', new ByteArrayInputStream(text.getBytes('UTF-8')),
 					"convertcase-$from-$to-${message.id}.txt")
-			else formatted(text)
+			else respond(text)
 		}
 
 		command('say',
@@ -168,25 +168,25 @@ class QuickCommands extends CommandRegister {
 			description: 'Repeats text.',
 			usages: [
 				' (text)': 'Guess.'
-			]){ formatted(arguments) }
+			]) { respond(arguments) }
 
 		command('ping',
 			id: '19',
 			description: 'Testing response times.',
 			usages: [
 				'': 'Starts the response time difference sequence.'
-			]){
+			]) {
 			def x = System.currentTimeMillis()
-			def text = 'Man i love dicsord4j.'
-			def m = formatted(text)
+			def text = new StringBuilder('Ha hah.aa. ah.a.')
+			def m = respond(text.toString())
 			def y = System.currentTimeMillis()
 			def b = y - x
-			text += "\nSent after $b ms."
-			m.edit(MiscUtil.block(KarmaFields.format(text), 'accesslog'))
+			text.append "\nSent after $b ms."
+			m.edit(KarmaFields.format(text.toString()))
 			def z = System.currentTimeMillis()
 			def c = z - y
-			text += "\nEdited after $c ms."
-			m.edit(MiscUtil.block(KarmaFields.format(text), 'accesslog'))
+			text.append "\nEdited after $c ms."
+			m.edit(KarmaFields.format(text.toString()))
 		}
 	}
 }

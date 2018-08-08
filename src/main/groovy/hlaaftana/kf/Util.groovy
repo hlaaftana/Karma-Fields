@@ -2,12 +2,13 @@ package hlaaftana.kf
 
 import com.mashape.unirest.http.Unirest
 import groovy.transform.CompileStatic
+import groovy.transform.stc.ClosureParams
+import groovy.transform.stc.FromString
 import hlaaftana.discordg.util.bot.CommandEventData
 import hlaaftana.discordg.util.ConversionUtil
 import hlaaftana.discordg.util.MiscUtil
 import hlaaftana.discordg.objects.Message
 import hlaaftana.discordg.objects.User
-import hlaaftana.kismet.StringEscaper
 
 import javax.imageio.ImageIO
 import java.awt.*
@@ -21,9 +22,10 @@ class Util {
 	private static Random colorRandom = new Random()
 
 	static ByteArrayOutputStream draw(Map arguments = Collections.emptyMap(),
+	                                  @ClosureParams(value = FromString, options = ['java.awt.image.BufferedImage'])
 	                                  @DelegatesTo(Graphics2D) Closure closure) {
 		BufferedImage image = new BufferedImage((arguments.width as Integer) ?: 256,
-			(arguments['height'] as Integer) ?: 256, (arguments.colorType as Integer) ?:
+			(arguments.height as Integer) ?: 256, (arguments.colorType as Integer) ?:
 			BufferedImage.TYPE_INT_RGB)
 		Graphics2D graphics = image.createGraphics()
 		Closure ass = (Closure) closure.clone()
@@ -36,10 +38,37 @@ class Util {
 		baos
 	}
 
-	static String quote(String a) {
-		final x = StringEscaper.escapeSoda(a)
+	static String escapeDoubleQuote(String a) {
+		def builder = new StringBuilder(a.size())
+		for (char c : a.toCharArray()) {
+			if ((c == (char) '\\') || c == (char) '"') builder.append((char) '\\')
+			builder.append(c)
+		}
+		builder.toString()
+	}
+
+	static String doubleQuote(String a) {
+		final x = escapeDoubleQuote(a)
 		final chars = new char[2 + x.length()]
 		chars[0] = chars[chars.length - 1] = (char) '"'
+		final xc = x.chars
+		System.arraycopy(xc, 0, chars, 1, xc.length)
+		String.valueOf(chars)
+	}
+
+	static String escapeSingleQuote(String a) {
+		def builder = new StringBuilder(a.size())
+		for (char c : a.toCharArray()) {
+			if ((c == (char) '\\') || c == (char) '\'') builder.append((char) '\\')
+			builder.append(c)
+		}
+		builder.toString()
+	}
+
+	static String singleQuote(String a) {
+		final x = escapeDoubleQuote(a)
+		final chars = new char[2 + x.length()]
+		chars[0] = chars[chars.length - 1] = (char) '\''
 		final xc = x.chars
 		System.arraycopy(xc, 0, chars, 1, xc.length)
 		String.valueOf(chars)

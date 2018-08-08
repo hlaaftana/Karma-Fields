@@ -7,7 +7,6 @@ import hlaaftana.discordg.util.bot.CleverbotDotIO
 import hlaaftana.discordg.util.bot.CommandBot
 import hlaaftana.discordg.util.bot.CommandEventData
 import hlaaftana.discordg.util.MiscUtil
-import hlaaftana.discordg.util.bot.CommandType
 import hlaaftana.discordg.util.bot.DSLCommand
 import hlaaftana.kf.registers.*
 import hlaaftana.discordg.*
@@ -30,24 +29,26 @@ class KarmaFields {
 	static Client client = new Client(token: creds.<String>get('token'))
 	static boolean ready
 	static CommandBot bot = new CommandBot(logName: '|><|Bot', triggers: ['P!', 'poo! '], client: client,
-		formatter: this.&format, extraCommandArgs: [guildData: { CommandEventData e -> guildData[e.guild.id] }])
+		formatter: this.&format, extraCommandArgs: [guildData: (Closure) { CommandEventData e -> guildData[e.guild.id] }])
 	static String appId = creds.<String>get('app_id')
 	static List<CommandRegister> registers = []
 	static CleverbotDotIO cleverbot = new CleverbotDotIO(
 			creds.<String>get('cb_user'),
 			creds.<String>get('cb_key'))
-	static Map<String, DataFile> guildData = [:]
+	static Map<Snowflake, DataFile> guildData = [:]
+	static List<Invite> oldInvites
 	@Lazy static File exceptionLogFile = new File("dumps/exceptions_${System.currentTimeMillis()}.txt")
 
 	static {
+		println client.token
 		MiscUtil.registerStaticMethods()
+		client.extraIdentifyData.putAll presence: [game: [name: 'P!help', type: 0]]
 
 		client.addListener 'ready', {
-			client.play 'poo! help'
-			client.fields.oldInvites = (List<Invite>) client.guild(287659842330558464).channels.collectMany {
-				if (!it.permissionsFor(client)['manageChannel']) return Collections.emptyList()
+			oldInvites = (List<Invite>) client.guild(287659842330558464).channels.collectMany {
+				if (!it.permissionsFor(client)['manageChannel']) return Collections.<Invite>emptyList()
 
-				(Collection) it.requestInvites()
+				it.requestInvites()
 			}
 			if (!ready) {
 				for (g in client.guilds) {
@@ -62,7 +63,7 @@ class KarmaFields {
 
 		client.addReconnector()
 
-		bot.log.formatter = client.log.formatter = { Log.Message message ->
+		bot.log.formatter = client.log.formatter = { Log.SimpleMessage message ->
 			String.format('[%s] [%s]: %s',
 					message.level.name.toUpperCase(),
 					message.by, message.content)
@@ -94,7 +95,7 @@ class KarmaFields {
 
 		bot.initialize()
 		bot.listenerSystem.removeListener(CommandBot.Events.EXCEPTION, bot.exceptionListener)
-		client.login()
+		Thread.start { client.login() }
 	}
 
 	static main(args){

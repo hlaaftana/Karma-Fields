@@ -60,11 +60,11 @@ public class Arguments implements Iterator {
 		return index < raw.length();
 	}
 
-	public Integer goBack(int i) {
+	public int goBack(int i) {
 		return index -= i;
 	}
 
-	public Integer goBack(CharSequence str) {
+	public int goBack(CharSequence str) {
 		raw = str.toString().concat(raw);
 		return index -= str.length();
 	}

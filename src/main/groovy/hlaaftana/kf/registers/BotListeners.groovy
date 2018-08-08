@@ -6,6 +6,7 @@ import hlaaftana.discordg.objects.Guild
 import hlaaftana.discordg.objects.Invite
 import hlaaftana.discordg.objects.Member
 import hlaaftana.discordg.util.bot.BotExceptionEventData
+import hlaaftana.discordg.util.bot.BotMapEventData
 import hlaaftana.kf.CommandRegister
 import hlaaftana.kf.DataFile
 import hlaaftana.kf.KarmaFields
@@ -30,23 +31,17 @@ class BotListeners extends CommandRegister {
 			// compilestatic
 			def guild = (Guild) e.guild
 
-			try {
-				Role role = guild.role('|><|')
-				role.edit(color: 0x66c2)
-			} catch (ignored) {}
-
-			guild.sendMessage format('Looks like I joined. Do |>help or ><help to learn more.')
-			File a = new File("guilds/${guild.id}.json")
+			def a = new File("guilds/${guild.id}.json")
 			if (!a.text) JSONUtil.dump(a, [:])
 			KarmaFields.guildData[guild.id] = new DataFile(a)
 		}
 
 		client.addListener('member') { Map<String, Object> e ->
-			def old = (List<Invite>) client.fields.oldInvites
-			def nev = client.fields.oldInvites = (List<Invite>) client.guild(287659842330558464).channels.collectMany {
-				if (!it.permissionsFor(client)['manageChannel']) return Collections.emptyList()
+			def old = (List<Invite>) KarmaFields.oldInvites
+			def nev = KarmaFields.oldInvites = client.guild(287659842330558464).channels.collectMany {
+				if (!it.permissionsFor(client)['manageChannel']) return (Collection<Invite>) Collections.<Invite>emptyList()
 
-				(Collection) it.requestInvites()
+				(Collection<Invite>) it.requestInvites()
 			}
 
 			client.channel(402301704999010304).send embed: [
@@ -56,6 +51,10 @@ class BotListeners extends CommandRegister {
 					[name: 'New', value: nev.collect(this.&toString).join('\n')]
 				]
 			]
+		}
+
+		bot.listenerSystem.addListener(CommandBot.Events.NO_COMMAND) { BotMapEventData e ->
+			new File("../markovs/${((Map) e.data.author).id}.txt") << (String) e.data.content << '\r\n'
 		}
 
 		bot.listenerSystem.addListener(CommandBot.Events.EXCEPTION) { BotExceptionEventData d ->
